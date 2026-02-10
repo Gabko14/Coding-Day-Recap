@@ -29,7 +29,7 @@ python3 ~/.claude/skills/day-summary/scripts/setup_agent.py
 
 If the agent was just created, tell the user to run `/agents` or restart the session, then re-invoke the skill.
 
-### Phase 1: Gather Quantitative Data
+### Phase 1: Gather Data & Pre-Extract Sessions
 
 1. **Resolve the date** to ISO format `YYYY-MM-DD`. For `today`/`yesterday`, compute from the current system date. **Always verify the day of the week** — never guess it:
    ```bash
@@ -41,28 +41,34 @@ If the agent was just created, tell the user to run `/agents` or restart the ses
    cass index
    ```
 
-3. **Gather stats** from CASS. Run these commands and aggregate the results:
+3. **Pre-extract sessions into time-block files** using the pre_extract script. This discovers sessions via `cass timeline --json`, parses `.jsonl` files directly, deduplicates streaming entries, and samples START/MIDDLE/END of each session. Run once per time block:
    ```bash
-   # Total sessions (from timeline footer)
-   cass timeline --since YYYY-MM-DD --until YYYY-MM-DDT23:59:59 --agent claude_code
-   # Workspace breakdown
-   cass search "query" --since YYYY-MM-DD --until YYYY-MM-DDT23:59:59 --agent claude_code --limit 500 --json --aggregate workspace --max-tokens 2000
-   # Agent breakdown
-   cass search "query" --since YYYY-MM-DD --until YYYY-MM-DDT23:59:59 --limit 500 --json --aggregate agent --max-tokens 2000
-   ```
-   Use any non-empty search term (e.g., "the") instead of `*` — CASS rejects bare `*` in some modes.
-   Collect: total sessions, unique sessions, total messages, hourly distribution, workspace breakdown, agent breakdown.
+   # Morning (with stats for the full day)
+   python3 ~/.claude/skills/day-summary/scripts/pre_extract.py \
+     --from YYYY-MM-DDT00:00:00 --until YYYY-MM-DDT12:00:00 \
+     --output ~/Desktop/day-extract-morning.txt \
+     --stats-output ~/Desktop/day-stats-YYYY-MM-DD.json
 
-4. **Get the timeline** for session listing:
-   ```bash
-   cass timeline --since YYYY-MM-DD --until YYYY-MM-DDT23:59:59 --agent claude_code
-   ```
+   # Midday
+   python3 ~/.claude/skills/day-summary/scripts/pre_extract.py \
+     --from YYYY-MM-DDT12:00:00 --until YYYY-MM-DDT15:00:00 \
+     --output ~/Desktop/day-extract-midday.txt
 
-5. **Get session file paths** for deep reading. `cass timeline` doesn't output machine-readable paths. To find actual session files, use:
-   ```bash
-   cass search "keyword" --since YYYY-MM-DD --until YYYY-MM-DDT23:59:59 --agent claude_code --limit 10 --robot-format sessions
+   # Afternoon
+   python3 ~/.claude/skills/day-summary/scripts/pre_extract.py \
+     --from YYYY-MM-DDT15:00:00 --until YYYY-MM-DDT18:00:00 \
+     --output ~/Desktop/day-extract-afternoon.txt
+
+   # Evening (extends to 04:00 next day to capture late-night work)
+   python3 ~/.claude/skills/day-summary/scripts/pre_extract.py \
+     --from YYYY-MM-DDT18:00:00 --until YYYY-MM-DD+1T04:00:00 \
+     --output ~/Desktop/day-extract-evening.txt
    ```
-   Use a keyword relevant to the session (from its title in the timeline). This returns `.jsonl` file paths that can be passed to `cass expand`.
+   Replace `YYYY-MM-DD+1` with the actual next day's date (e.g., `2026-02-10T04:00:00` for Feb 9).
+
+   The `--stats-output` flag (only needed once) produces a JSON file with workspace/agent breakdowns, total sessions, and hourly distribution.
+
+4. **Read the stats JSON** (`~/Desktop/day-stats-YYYY-MM-DD.json`) for workspace breakdown, agent breakdown, session totals, and hourly distribution.
 
 ### Phase 2: Build Accurate Narrative (CRITICAL)
 
@@ -70,9 +76,12 @@ This is the most important phase. **Accuracy over speed.** The narrative must re
 
 #### Accuracy Rules
 
-1. **Check git log** to distinguish "coded today" from "committed today":
+1. **Check git log** to distinguish "coded today" from "committed today". **Always filter by the user's author name** to exclude teammate/CI commits:
    ```bash
-   git -C "<repo>" log --format="%h %ai %s" --since="YYYY-MM-DD" --until="YYYY-MM-DD+1" --all
+   # Get the user's git author name
+   git config user.name
+   # Then use it to filter
+   git -C "<repo>" log --format="%h %ai %s" --since="YYYY-MM-DD" --until="YYYY-MM-DD+1" --all --author="<name>"
    ```
    Also check the previous few days for context. If today has one commit but the code existed before, the day was about REVIEWING/COMMITTING, not coding.
 
@@ -92,24 +101,27 @@ This is the most important phase. **Accuracy over speed.** The narrative must re
 
 6. **Verify the day of the week.** Never assume. Always compute it.
 
-#### Session Reading Strategy — Independent Haiku Subagents
+#### Session Reading Strategy — Pre-Extracted Files + Haiku Subagents
 
-Launch independent subagents in parallel (one per time block + one for git history) using the Task tool with `haiku-reader` subagent type (set up in Phase 0). This ensures session readers run on Haiku for cost efficiency.
+The `pre_extract.py` script (Phase 1) has already extracted sampled session content into text files — one per time block. Subagents read these files instead of running `cass expand` commands, reducing tool calls from ~10 per subagent to just 1.
 
-**1. Split the day into time blocks** (e.g., morning, early afternoon, late afternoon, evening). Also create a git-history task.
+**1. Launch subagents in parallel** using the Task tool with `haiku-reader` subagent type (one per time block + one for git history). Each session-reader prompt should be:
+```
+Read the file at ~/Desktop/day-extract-morning.txt using the Read tool.
+This contains pre-extracted session content from YYYY-MM-DD (morning block).
+For each session in the file, determine:
+- What work was done (coded, reviewed, explored, refined, committed)
+- Key outcomes or artifacts produced
+- Whether this activity clearly continues into another time block
+Report your findings concisely, organized by session.
+```
 
-**2. Launch subagents in parallel** using a single message with multiple Task tool calls. Each subagent prompt should include:
-- The time range to cover
-- The list of significant user-driven sessions in that block (ignore subagent/teammate sessions with `<teammate-message` prefixes)
-- Session file paths (from Phase 1) and instructions to use `cass expand --line N -C 5 "PATH"` at START, MIDDLE, and END of each session
-- Instructions to report: what happened, was this new work or review, key outcomes, and any activity that clearly continues into another time block
+The git-history subagent is unchanged — it still runs `git log` commands across repos.
 
-**3. Synthesize after all subagents return.** You (the main agent) are responsible for:
+**2. Synthesize after all subagents return.** You (the main agent) are responsible for:
 - **Merging cross-block threads** into single timeline items with time ranges spanning the full duration
 - **Deduplicating** — if morning and afternoon subagents both report "reviewed the same feature", that's one timeline item with a wide time range, not two separate items
-- **Resolving conflicts** — if subagents disagree on what happened, re-read the session yourself to break the tie
-
-> **Note:** Agent teams (`TeamCreate`) can theoretically improve cross-block communication, but currently do not respect custom agent model overrides — teammates will run on the global model (e.g., Opus) regardless of the `haiku-reader` agent definition. Use independent subagents until this is fixed.
+- **Resolving conflicts** — if subagents disagree on what happened, re-read the pre-extracted file yourself to break the tie
 
 #### Timeline Item Schema
 
