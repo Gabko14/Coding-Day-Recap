@@ -97,7 +97,7 @@ day-summary/
 ├── SKILL.md              # Claude Code skill definition
 ├── scripts/
 │   ├── generate_html.py  # JSON → HTML generator (Python)
-│   └── setup-agent.sh    # Creates haiku-reader agent definition
+│   └── setup_agent.py    # Creates haiku-reader agent definition
 ├── assets/
 │   └── template.html     # HTML/CSS template
 ├── examples/

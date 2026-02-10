@@ -24,7 +24,7 @@ If no date argument is provided, **ask the user** which day to visualize. Do not
 Session readers use a lightweight Haiku-based custom agent for cost efficiency. Run the setup script:
 
 ```bash
-bash ~/.claude/skills/day-summary/scripts/setup-agent.sh
+python3 ~/.claude/skills/day-summary/scripts/setup_agent.py
 ```
 
 If the agent was just created, tell the user to run `/agents` or restart the session, then re-invoke the skill.
