@@ -1,0 +1,248 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="theme-color" content="#0a0908">
+<title>{{DATE_DISPLAY}} — The Daily Commit</title>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,100..900;1,9..144,100..900&family=Azeret+Mono:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0a0908;
+    --surface: #12110e;
+    --surface-2: #1b1916;
+    --surface-3: #24221e;
+    --border: #332f29;
+    --text: #ece8df;
+    --text-dim: #9b9488;
+    --text-muted: #605a4f;
+    --accent: #a78bfa;
+    --accent-dim: #7c5fc4;
+    --warm: #e07a3a;
+    --warm-dim: #9a5428;
+    --success: #5ec295;
+    --danger: #e05469;
+    --blue: #5b9be8;
+    --cyan: #5ccec4;
+    --gold: #c9a84c;
+    --gold-dim: #8a7430;
+  }
+
+  *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+  body {
+    background: var(--bg); color: var(--text);
+    font-family: 'Azeret Mono', monospace;
+    font-weight: 300; line-height: 1.6;
+    min-height: 100vh; overflow-x: hidden;
+  }
+  ::selection { background: var(--gold); color: var(--bg); }
+
+  .grain {
+    position: fixed; inset: 0; pointer-events: none; z-index: 9999;
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+    background-size: 256px;
+    -webkit-mask-image: linear-gradient(to bottom, rgba(0,0,0,1) 0%, rgba(0,0,0,0) 100%);
+    mask-image: linear-gradient(to bottom, rgba(0,0,0,1) 0%, rgba(0,0,0,0) 100%);
+    opacity: 0.03;
+  }
+  .atmo {
+    position: fixed; inset: 0; pointer-events: none; z-index: 0;
+    background: radial-gradient(ellipse at 80% 5%, rgba(201,168,76,0.06) 0%, transparent 50%);
+  }
+
+  .page { max-width: 980px; margin: 0 auto; padding: 52px 40px 100px; position: relative; z-index: 1; }
+
+  /* Hero */
+  .hero-rule { height: 2px; background: linear-gradient(90deg, var(--gold), var(--gold-dim), transparent); margin-bottom: 28px; }
+  .masthead { font-size: 10px; font-weight: 500; letter-spacing: 4px; text-transform: uppercase; color: var(--gold); margin-bottom: 4px; }
+  .dateline { font-size: 12px; font-weight: 300; letter-spacing: 1px; color: var(--text-muted); margin-bottom: 44px; }
+  .hl {
+    font-family: 'Fraunces', serif; font-optical-sizing: auto;
+    font-size: clamp(48px, 7.5vw, 88px); font-weight: 400;
+    line-height: 1.06; letter-spacing: -1px;
+    color: var(--text); margin-bottom: 20px;
+  }
+  .hl em { font-style: italic; color: var(--gold); }
+  .sub { font-family: 'Fraunces', serif; font-size: 16px; font-weight: 300; color: var(--text-dim); max-width: 620px; line-height: 1.7; margin-bottom: 36px; }
+
+  /* Inline stats */
+  .stats-inline { font-size: 12px; color: var(--text-muted); letter-spacing: 0.5px; display: flex; align-items: baseline; flex-wrap: wrap; gap: 4px; }
+  .stats-inline strong { font-family: 'Fraunces', serif; font-size: 20px; color: var(--text); font-weight: 500; }
+  .stats-inline .gold { color: var(--gold); }
+  .stat-sep { margin: 0 10px; opacity: 0.25; }
+
+  .divider { height: 1px; margin: 48px 0; background: linear-gradient(90deg, transparent, var(--border), transparent); }
+
+  .sec-label {
+    font-size: 10px; font-weight: 500; letter-spacing: 3px;
+    text-transform: uppercase; color: var(--text-muted);
+    margin-bottom: 28px; display: flex; align-items: center; gap: 16px;
+  }
+  .sec-label::after { content: ''; flex: 1; height: 1px; background: var(--border); }
+
+  /* Day Map */
+  .daymap { position: relative; }
+  .daymap-lanes { display: flex; flex-direction: column; gap: 5px; }
+  .lane { display: grid; grid-template-columns: 140px 1fr; gap: 8px; align-items: center; height: 30px; }
+  .lane-label { font-size: 11px; font-weight: 400; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; opacity: 0.65; transition: opacity 0.3s; }
+  .lane:hover .lane-label { opacity: 1; }
+  .lane-track { position: relative; height: 100%; background: var(--surface); border-radius: 4px; overflow: visible; }
+  .lane:nth-child(even) .lane-track { background: rgba(18,17,14,0.6); }
+  .lane-bar {
+    position: absolute; top: 3px; bottom: 3px; border-radius: 3px; opacity: 0.8;
+    transition: opacity 0.3s, filter 0.3s; cursor: default; transform-origin: left;
+  }
+  .lane-bar:hover { opacity: 1; filter: brightness(1.3); }
+  .lane-bar[data-tip]::after {
+    content: attr(data-tip);
+    position: absolute; bottom: calc(100% + 8px); left: 50%; transform: translateX(-50%);
+    white-space: nowrap; background: var(--surface-3); border: 1px solid var(--border);
+    padding: 4px 10px; border-radius: 4px; font-size: 10px; color: var(--text);
+    opacity: 0; pointer-events: none; transition: opacity 0.2s; z-index: 10;
+  }
+  .lane-bar:hover::after { opacity: 1; }
+  .commit-marker {
+    top: 2px !important; bottom: 2px !important; min-width: 14px; border-radius: 7px;
+    box-shadow: 0 0 14px rgba(201,168,76,0.45), 0 0 4px rgba(201,168,76,0.3);
+  }
+  .daymap-axis { position: relative; height: 24px; margin-left: 148px; margin-top: 10px; }
+  .daymap-axis span { position: absolute; transform: translateX(-50%); font-size: 9px; color: var(--text-muted); font-weight: 300; }
+
+  @keyframes growRight { from { transform: scaleX(0); } to { transform: scaleX(1); } }
+  .daymap-section.visible .lane-bar { animation: growRight 0.8s cubic-bezier(0.16, 1, 0.3, 1) both; }
+
+  /* Journal */
+  .journal-feed { display: flex; flex-direction: column; gap: 10px; }
+  .event {
+    background: var(--surface); border-left: 3px solid var(--ev-color, var(--border));
+    border-radius: 0 8px 8px 0; padding: 20px 24px;
+    transition: background 0.3s, transform 0.3s;
+  }
+  .event:hover { background: var(--surface-2); transform: translateX(3px); }
+  .event.spanning { border-left-width: 5px; }
+  .event-meta { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 10px; }
+  .event-time { font-size: 11px; color: var(--text-muted); }
+  .event-msgs { font-size: 10px; color: var(--text-muted); background: var(--surface-3); padding: 2px 8px; border-radius: 10px; }
+  .event-msgs.highlight { background: var(--gold-dim); color: var(--text); }
+  .event-title { font-family: 'Fraunces', serif; font-size: 19px; font-weight: 500; color: var(--text); margin-bottom: 8px; line-height: 1.3; }
+  .event-desc { font-family: 'Fraunces', serif; font-size: 13.5px; font-weight: 300; color: var(--text-dim); line-height: 1.75; margin-bottom: 10px; }
+  .event-tags { display: flex; gap: 8px; flex-wrap: wrap; }
+  .tag { font-size: 10px; padding: 2px 8px; border-radius: 3px; border: 1px solid; letter-spacing: 0.3px; }
+
+  /* Bottom grid */
+  .bottom-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 48px; }
+  .ws-row { display: grid; grid-template-columns: 155px 1fr 44px; align-items: center; gap: 14px; padding: 11px 0; border-bottom: 1px solid rgba(51,47,41,0.5); }
+  .ws-label { font-size: 11px; color: var(--text-dim); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .ws-track { height: 4px; background: var(--surface); border-radius: 2px; overflow: hidden; }
+  .ws-fill { height: 100%; border-radius: 2px; transition: width 1.2s cubic-bezier(0.16, 1, 0.3, 1); }
+  .ws-num { font-size: 11px; color: var(--text-muted); text-align: right; }
+  .agent-item { display: grid; grid-template-columns: 24px 1fr auto auto; align-items: center; gap: 8px; padding: 12px 0; border-bottom: 1px solid rgba(51,47,41,0.5); }
+  .agent-glyph { font-size: 14px; color: var(--gold); }
+  .agent-name { font-size: 12px; font-weight: 500; color: var(--text); }
+  .agent-val { font-family: 'Fraunces', serif; font-size: 20px; color: var(--gold); line-height: 1; }
+  .agent-unit { font-size: 10px; color: var(--text-muted); }
+
+  /* Hero footer */
+  .hero-foot { text-align: center; padding: 80px 0 32px; }
+  .hero-num {
+    font-family: 'Fraunces', serif;
+    font-size: clamp(100px, 18vw, 220px); font-weight: 300; line-height: 0.85;
+    background: linear-gradient(135deg, var(--gold), #e8c86a, var(--gold-dim));
+    -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+    background-clip: text; margin-bottom: 20px;
+    animation: pulse 4s ease-in-out infinite;
+  }
+  .hero-cap { font-size: 11px; letter-spacing: 2px; text-transform: uppercase; color: var(--text-muted); }
+
+  .reveal { opacity: 0; transform: translateY(24px); transition: opacity 0.7s ease, transform 0.7s cubic-bezier(0.16, 1, 0.3, 1); }
+  .reveal.visible { opacity: 1; transform: translateY(0); }
+
+  @keyframes pulse {
+    0%, 100% { filter: drop-shadow(0 0 40px rgba(201,168,76,0.2)); }
+    50% { filter: drop-shadow(0 0 60px rgba(201,168,76,0.4)); }
+  }
+
+  @media (max-width: 768px) {
+    .page { padding: 28px 18px 60px; }
+    .lane { grid-template-columns: 100px 1fr; gap: 6px; height: 26px; }
+    .lane-label { font-size: 9px; }
+    .daymap-axis { margin-left: 106px; }
+    .bottom-grid { grid-template-columns: 1fr; gap: 32px; }
+    .ws-row { grid-template-columns: 120px 1fr 36px; }
+    .stats-inline { flex-direction: column; gap: 6px; }
+    .stat-sep { display: none; }
+  }
+</style>
+</head>
+<body>
+
+<div class="grain"></div>
+<div class="atmo"></div>
+
+<main class="page">
+  <header class="reveal">
+    <div class="hero-rule"></div>
+    <div class="masthead">The Daily Commit</div>
+    <div class="dateline">{{DATE_LONG}}</div>
+    <h1 class="hl">{{HEADLINE}}</h1>
+    <p class="sub">{{SUBTITLE}}</p>
+    <div class="stats-inline">{{STATS_INLINE}}</div>
+  </header>
+
+  <div class="divider"></div>
+
+  <section class="daymap-section reveal">
+    <h2 class="sec-label">The Day Map</h2>
+    <div class="daymap">
+      <div class="daymap-lanes">
+{{DAYMAP_LANES}}
+      </div>
+      <div class="daymap-axis">
+{{DAYMAP_AXIS}}
+      </div>
+    </div>
+  </section>
+
+  <div class="divider"></div>
+
+  <section class="journal reveal">
+    <h2 class="sec-label">What Got Done</h2>
+    <div class="journal-feed">
+{{JOURNAL_ITEMS}}
+    </div>
+  </section>
+
+  <div class="divider"></div>
+
+  <section class="bottom-grid">
+    <div class="reveal">
+      <h2 class="sec-label">Workspaces</h2>
+{{WORKSPACE_ROWS}}
+    </div>
+    <div class="reveal">
+      <h2 class="sec-label">Agents</h2>
+{{AGENT_ITEMS}}
+    </div>
+  </section>
+
+  <footer class="hero-foot reveal">
+    <div class="hero-num">{{HERO_NUMBER}}</div>
+    <div class="hero-cap">{{HERO_LABEL}}</div>
+  </footer>
+</main>
+
+<script>
+const observer = new IntersectionObserver((entries) => {
+  entries.forEach(entry => {
+    if (entry.isIntersecting) {
+      entry.target.classList.add('visible');
+      observer.unobserve(entry.target);
+    }
+  });
+}, { threshold: 0.08, rootMargin: '0px 0px -30px 0px' });
+document.querySelectorAll('.reveal').forEach(el => observer.observe(el));
+</script>
+
+</body>
+</html>
