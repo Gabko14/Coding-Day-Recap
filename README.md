@@ -7,7 +7,7 @@ A [Claude Code](https://docs.anthropic.com/en/docs/claude-code) skill that gener
 ## What it does
 
 1. **Gathers quantitative data** — session counts, hourly activity distribution, workspace breakdown, agent breakdown
-2. **Reads sessions deeply** — uses agent teams to read the START, MIDDLE, and END of each significant session, cross-referencing findings across time blocks
+2. **Reads sessions deeply** — launches parallel haiku subagents to read the START, MIDDLE, and END of each significant session
 3. **Builds an accurate narrative** — distinguishes "coded" from "reviewed" from "committed", traces activity threads across sessions, checks git history for ground truth
 4. **Generates an HTML dashboard** — dark-themed, self-contained, with a Day Map swimlane visualization, journal feed, workspace breakdown, and a hero stat
 
@@ -15,29 +15,32 @@ A [Claude Code](https://docs.anthropic.com/en/docs/claude-code) skill that gener
 
 - **[Claude Code](https://docs.anthropic.com/en/docs/claude-code)** — the CLI tool by Anthropic
 - **[CASS](https://github.com/Dicklesworthstone/coding_agent_session_search)** — Coding Agent Session Search. Indexes sessions from Claude Code, Cursor, Codex, Gemini, and more
-- **PowerShell** — scripts are written in PowerShell (ships with Windows)
+- **Python 3** — required for the HTML generation script (ships with macOS; included with CASS on other platforms)
 
 ## Platform
 
-**Windows** (PowerShell). macOS/Linux support is planned but not yet implemented.
+**macOS, Linux, Windows** — all scripts are Python, no platform-specific dependencies.
 
 ## Installation
 
 1. Clone this repo:
    ```bash
-   git clone https://github.com/YOUR_USERNAME/day-summary.git
+   git clone https://github.com/Gabko14/Coding-Day-Recap.git
    ```
 
 2. Copy or symlink to your Claude Code skills directory:
+   ```bash
+   # macOS / Linux (symlink — stays in sync with git pulls)
+   ln -s /path/to/day-summary ~/.claude/skills/day-summary
+   ```
    ```powershell
-   # Option A: Symlink (recommended — stays in sync with git pulls)
+   # Windows (junction — stays in sync with git pulls)
    New-Item -ItemType Junction -Path "$HOME\.claude\skills\day-summary" -Target "C:\path\to\day-summary"
-
-   # Option B: Copy
-   Copy-Item -Recurse "C:\path\to\day-summary" "$HOME\.claude\skills\day-summary"
    ```
 
-3. Verify the skill appears in Claude Code:
+3. Run the skill once — it will auto-create a `haiku-reader` agent at `~/.claude/agents/haiku-reader.md` for cost-efficient session reading. After the first run, reload agents with `/agents` or restart your session.
+
+4. Verify the skill appears in Claude Code:
    ```
    /day-summary today
    ```
@@ -54,24 +57,26 @@ In Claude Code, invoke the skill with a date:
 
 The skill will:
 1. Index your CASS data
-2. Spawn an agent team to deeply read your sessions
+2. Launch parallel haiku subagents to deeply read your sessions
 3. Synthesize findings into a coherent timeline
 4. Generate an HTML dashboard on your Desktop
 5. Open it in your browser
 
-## Agent Teams
+## Haiku Readers
 
-This skill works best with **Claude Code agent teams** enabled. The team-based approach lets time-block readers communicate with each other — so when the morning reader sees "started reviewing feature X" and the afternoon reader sees "continued reviewing feature X", the team lead can merge them into one timeline item.
+Session readers use a custom **Haiku-based agent** (`haiku-reader`) for cost efficiency. The skill auto-creates this agent at `~/.claude/agents/haiku-reader.md` on first run. This keeps the main session on your preferred model (e.g., Opus) while running the read-heavy session scanning on Haiku — significantly reducing token costs.
 
-If agent teams are not available, the skill falls back to independent subagents. The main agent handles synthesis manually. This still works but may produce less accurate cross-session thread tracking.
+The skill launches independent haiku subagents in parallel (one per time block + one for git history). The main agent synthesizes their findings — merging cross-block threads, deduplicating overlapping activities, and resolving conflicts.
+
+> **Why not agent teams?** Agent teams (`TeamCreate`) would allow readers to cross-reference findings, but currently don't respect custom agent model overrides — teammates always run on the global model regardless of the `haiku-reader` definition. Independent subagents correctly use Haiku.
 
 ## How it works
 
 ### Phase 1: Quantitative Data
-Runs CASS queries to gather session counts, hourly distribution, workspace/agent breakdowns. Uses `gather-stats.ps1` with manual fallback commands.
+Runs CASS queries to gather session counts, hourly distribution, workspace/agent breakdowns.
 
 ### Phase 2: Narrative Building
-The critical phase. Spawns an agent team with one reader per time block (morning, afternoon, evening) plus a git history checker. Each reader uses `cass expand` to deeply read sessions at multiple points. The team lead synthesizes findings — merging cross-block threads, deduplicating overlapping activities, resolving conflicts.
+The critical phase. Launches independent haiku subagents in parallel — one per time block (morning, afternoon, evening) plus a git history checker. Each reader uses `cass expand` to deeply read sessions at multiple points. The main agent synthesizes findings — merging cross-block threads, deduplicating overlapping activities, resolving conflicts.
 
 Key accuracy rules:
 - **Check git history** to distinguish "coded today" from "committed code written last week"
@@ -79,7 +84,7 @@ Key accuracy rules:
 - **Name activities by what was done**, never by session size or tools used
 
 ### Phase 3: HTML Generation
-Writes a data JSON file following the schema in `scripts/generate-html.ps1`, then generates a self-contained HTML dashboard with:
+Writes a data JSON file following the schema in `scripts/generate_html.py`, then generates a self-contained HTML dashboard with:
 - **Day Map** — swimlane visualization showing activity bands across the day
 - **Journal Feed** — detailed cards for each activity with descriptions and tags
 - **Workspace Breakdown** — which repos got the most activity
@@ -91,8 +96,8 @@ Writes a data JSON file following the schema in `scripts/generate-html.ps1`, the
 day-summary/
 ├── SKILL.md              # Claude Code skill definition
 ├── scripts/
-│   ├── gather-stats.ps1  # CASS stats gatherer (PowerShell)
-│   └── generate-html.ps1 # JSON → HTML generator (PowerShell)
+│   ├── generate_html.py  # JSON → HTML generator (Python)
+│   └── setup-agent.sh    # Creates haiku-reader agent definition
 ├── assets/
 │   └── template.html     # HTML/CSS template
 ├── examples/
