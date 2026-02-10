@@ -1,4 +1,4 @@
-# day-summary
+# Coding Day Recap
 
 A [Claude Code](https://docs.anthropic.com/en/docs/claude-code) skill that generates a visual HTML dashboard summarizing your daily AI coding sessions. It mines session data from [CASS](https://github.com/Dicklesworthstone/coding_agent_session_search), reads sessions deeply to build an accurate narrative, and produces a self-contained dark-themed dashboard.
 
