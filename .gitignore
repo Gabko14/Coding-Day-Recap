@@ -3,3 +3,6 @@
 
 # Claude Code local settings
 .claude/
+
+# Override global gitignore — we want beads tracked in this repo
+!.beads/

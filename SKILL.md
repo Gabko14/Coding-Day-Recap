@@ -19,16 +19,6 @@ If no date argument is provided, **ask the user** which day to visualize. Do not
 
 ## Workflow
 
-### Phase 0: Ensure Haiku Reader Agent Exists
-
-Session readers use a lightweight Haiku-based custom agent for cost efficiency. Run the setup script:
-
-```bash
-python3 ~/.claude/skills/day-summary/scripts/setup_agent.py
-```
-
-If the agent was just created, tell the user to run `/agents` or restart the session, then re-invoke the skill.
-
 ### Phase 1: Gather Data & Pre-Extract Sessions
 
 1. **Resolve the date** to ISO format `YYYY-MM-DD`. For `today`/`yesterday`, compute from the current system date. **Always verify the day of the week** — never guess it:
@@ -109,11 +99,11 @@ This is the most important phase. **Accuracy over speed.** The narrative must re
 
 6. **Verify the day of the week.** Never assume. Always compute it.
 
-#### Session Reading Strategy — Pre-Extracted Files + Haiku Subagents
+#### Session Reading Strategy — Pre-Extracted Files + Subagents
 
 The `pre_extract.py` script (Phase 1) has already extracted sampled session content into text files — one per time block. Subagents read these files instead of running `cass expand` commands, reducing tool calls from ~10 per subagent to just 1.
 
-**1. Launch subagents in parallel** using the Task tool with `haiku-reader` subagent type (one per time block + one for git history). Each session-reader prompt should be:
+**1. Launch subagents in parallel** using the Task tool with `subagent_type: "general-purpose"` and `model: "haiku"` (one per time block + one for git history). Each session-reader prompt should be:
 ```
 Read the file at ~/Desktop/day-extract-morning.txt using the Read tool.
 This contains pre-extracted session content from YYYY-MM-DD (morning block).
@@ -126,7 +116,7 @@ Report your findings concisely, organized by session.
 
 The git-history subagent is unchanged — it still runs `git log` commands across repos.
 
-Also launch a **browser-history reader** (haiku-reader) in parallel with the others:
+Also launch a **browser-history reader** (`general-purpose`, `model: "haiku"`) in parallel with the others:
 ```
 Read the file at ~/Desktop/browser-history-YYYY-MM-DD.txt using the Read tool.
 This contains browser history with visit durations from YYYY-MM-DD.
