@@ -46,7 +46,7 @@ else:  # Windows
 
 
 def find_browser_history():
-    """Finde die erste verfuegbare Browser-History-Datei."""
+    """Find the first available browser history file."""
     for name, path in BROWSER_PATHS:
         if path.exists():
             return name, path
@@ -54,18 +54,18 @@ def find_browser_history():
 
 
 def chromium_ts(dt):
-    """Konvertiere datetime zu Chromium-Timestamp (Mikrosekunden seit 1601)."""
+    """Convert datetime to Chromium timestamp (microseconds since 1601)."""
     return int(dt.timestamp() * 1_000_000) + CHROMIUM_EPOCH_OFFSET
 
 
 def chromium_to_local(ts):
-    """Konvertiere Chromium-Timestamp zu lokaler datetime."""
+    """Convert Chromium timestamp to local datetime."""
     unix_us = ts - CHROMIUM_EPOCH_OFFSET
     return datetime.fromtimestamp(unix_us / 1_000_000)
 
 
 def format_duration(microseconds):
-    """Formatiere Besuchsdauer als lesbaren String."""
+    """Format visit duration as a human-readable string."""
     if not microseconds or microseconds <= 0:
         return "0s"
     seconds = microseconds / 1_000_000
@@ -79,7 +79,7 @@ def format_duration(microseconds):
 
 
 def extract_history(db_path, date_str):
-    """Extrahiere alle Besuche fuer ein bestimmtes Datum."""
+    """Extract all visits for a given date."""
     date = datetime.strptime(date_str, "%Y-%m-%d")
     # Use local timezone for day boundaries so "today" means the user's local day
     day_start = datetime(date.year, date.month, date.day).astimezone()
@@ -124,7 +124,7 @@ def extract_history(db_path, date_str):
 
 
 def write_output(rows, total, unique, browser_name, date_str, output_path):
-    """Schreibe die extrahierten Daten in eine Textdatei."""
+    """Write extracted data to a text file."""
     with open(output_path, "w", encoding="utf-8") as f:
         f.write(f"BROWSER HISTORY: {date_str}\n")
         f.write(f"Source: {browser_name} | {total} visits | {unique} unique URLs\n")
@@ -139,7 +139,7 @@ def write_output(rows, total, unique, browser_name, date_str, output_path):
             dt = chromium_to_local(visit_time)
             dur_str = format_duration(visit_duration)
 
-            # Lueckenmarkierung einfuegen
+            # Insert gap marker
             if prev_time is not None:
                 gap_seconds = (visit_time - prev_time) / 1_000_000
                 if gap_seconds >= GAP_THRESHOLD_SECONDS:
@@ -164,18 +164,18 @@ def main():
     parser.add_argument("--output", required=True, help="Output file path")
     args = parser.parse_args()
 
-    # Datum validieren
+    # Validate date
     try:
         datetime.strptime(args.date, "%Y-%m-%d")
     except ValueError:
         print(f"Error: Invalid date format '{args.date}'. Use YYYY-MM-DD.", file=sys.stderr)
         sys.exit(1)
 
-    # Browser finden
+    # Find browser
     browser_name, db_path = find_browser_history()
     if not browser_name:
         print("No browser history found (no Edge/Chrome detected)")
-        # Leere Datei mit Header schreiben
+        # Write empty file with header
         output_path = os.path.expanduser(args.output)
         with open(output_path, "w", encoding="utf-8") as f:
             f.write(f"BROWSER HISTORY: {args.date}\n")
@@ -185,10 +185,10 @@ def main():
 
     print(f"Using {browser_name}: {db_path}")
 
-    # Daten extrahieren
+    # Extract data
     rows, total, unique = extract_history(db_path, args.date)
     if rows is None:
-        # Kopie fehlgeschlagen, leere Datei schreiben
+        # Copy failed, write empty file
         output_path = os.path.expanduser(args.output)
         with open(output_path, "w", encoding="utf-8") as f:
             f.write(f"BROWSER HISTORY: {args.date}\n")
@@ -196,7 +196,7 @@ def main():
         print(f"Empty output written to {output_path}")
         sys.exit(0)
 
-    # Ausgabe schreiben
+    # Write output
     output_path = os.path.expanduser(args.output)
     write_output(rows, total, unique, browser_name, args.date, output_path)
     print(f"Extracted {total} visits ({unique} unique URLs) to {output_path}")
