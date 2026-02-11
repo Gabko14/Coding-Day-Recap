@@ -48,7 +48,6 @@ def discover_sessions(from_dt, until_dt):
         "timeline", "--json", "--group-by", "none",
         "--since", from_dt,
         "--until", until_dt,
-        "--agent", "claude_code",
     ])
     if not raw:
         return [], 0
@@ -305,7 +304,6 @@ def gather_stats(from_dt, until_dt):
     raw = run_cass([
         "search", "the",
         "--since", from_dt, "--until", until_dt,
-        "--agent", "claude_code",
         "--limit", "500", "--json",
         "--aggregate", "workspace",
         "--max-tokens", "1000",
@@ -333,7 +331,6 @@ def gather_stats(from_dt, until_dt):
     raw = run_cass([
         "timeline", "--json", "--group-by", "hour",
         "--since", from_dt, "--until", until_dt,
-        "--agent", "claude_code",
     ])
     if raw:
         data = json.loads(raw)

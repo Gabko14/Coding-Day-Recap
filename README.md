@@ -1,6 +1,6 @@
 # Coding Day Recap
 
-A [Claude Code](https://docs.anthropic.com/en/docs/claude-code) skill that generates a visual HTML dashboard summarizing your daily AI coding sessions. It mines session data from [CASS](https://github.com/Dicklesworthstone/coding_agent_session_search), reads sessions deeply to build an accurate narrative, and produces a self-contained dark-themed dashboard.
+An [Agent Skill](https://agentskills.io) that generates a visual HTML dashboard summarizing your daily AI coding sessions. It mines session data from [CASS](https://github.com/Dicklesworthstone/coding_agent_session_search), reads sessions deeply to build an accurate narrative, and produces a self-contained dark-themed dashboard. Compatible with any coding agent that supports the Agent Skills standard — Claude Code, GitHub Copilot, OpenAI Codex, Cline, Roo Code, and more.
 
 ![Day Summary Dashboard](examples/screenshot.png)
 
@@ -13,7 +13,7 @@ A [Claude Code](https://docs.anthropic.com/en/docs/claude-code) skill that gener
 
 ## Prerequisites
 
-- **[Claude Code](https://docs.anthropic.com/en/docs/claude-code)** — the CLI tool by Anthropic
+- **A coding agent that supports [Agent Skills](https://agentskills.io)** — Claude Code, GitHub Copilot, OpenAI Codex, Cline, Roo Code, Windsurf, or any compatible tool
 - **[CASS](https://github.com/Dicklesworthstone/coding_agent_session_search)** — Coding Agent Session Search. Indexes sessions from Claude Code, Cursor, Codex, Gemini, and more
 - **Python 3** — required for the HTML generation script (ships with macOS; included with CASS on other platforms)
 
@@ -21,9 +21,9 @@ A [Claude Code](https://docs.anthropic.com/en/docs/claude-code) skill that gener
 
 **macOS, Linux, Windows** — all scripts are Python, no platform-specific dependencies.
 
-## What is a Claude Code Skill?
+## What is an Agent Skill?
 
-A [skill](https://docs.anthropic.com/en/docs/claude-code/skills) is a reusable prompt that extends Claude Code with specialized capabilities. Skills live in `~/.claude/skills/` and are defined by a `SKILL.md` file. Once installed, you invoke them with `/skill-name` in any Claude Code session (e.g., `/day-summary today`).
+An [Agent Skill](https://agentskills.io) is a reusable prompt package that extends AI coding agents with specialized capabilities. Skills are defined by a `SKILL.md` file and follow an open standard adopted by 27+ tools. Each tool stores skills in its own directory — see the installation section for common locations.
 
 ## Installation
 
@@ -38,27 +38,34 @@ A [skill](https://docs.anthropic.com/en/docs/claude-code/skills) is a reusable p
    git clone https://github.com/Gabko14/Coding-Day-Recap.git
    ```
 
-3. Symlink to your Claude Code skills directory:
-   ```bash
-   # Create skills directory if it doesn't exist
-   mkdir -p ~/.claude/skills
+3. Symlink to your agent's skills directory:
 
-   # macOS / Linux (symlink — stays in sync with git pulls)
+   | Tool | Skills directory |
+   |------|-----------------|
+   | Claude Code | `~/.claude/skills/` |
+   | OpenAI Codex | `~/.codex/skills/` |
+   | Cline | `~/.cline/skills/` (also reads `~/.claude/skills/`) |
+   | Roo Code | `~/.roo/skills/` |
+   | GitHub Copilot | `.github/skills/` (per-project) |
+
+   ```bash
+   # Example for Claude Code (macOS / Linux)
+   mkdir -p ~/.claude/skills
    ln -s /path/to/Coding-Day-Recap ~/.claude/skills/day-summary
    ```
    ```powershell
-   # Windows (junction — stays in sync with git pulls)
+   # Example for Claude Code (Windows)
    New-Item -ItemType Junction -Path "$HOME\.claude\skills\day-summary" -Target "C:\path\to\Coding-Day-Recap"
    ```
 
-4. Verify the skill appears in Claude Code:
+4. Invoke the skill (syntax varies by tool):
    ```
    /day-summary today
    ```
 
 ## Usage
 
-In Claude Code, invoke the skill with a date:
+Invoke the skill with a date argument (exact syntax depends on your tool):
 
 ```
 /day-summary today
@@ -75,11 +82,11 @@ The skill will:
 
 ## Subagent Architecture
 
-The skill launches independent subagents in parallel (one per time block + one for git history + one for browser history). Each subagent uses `model: "haiku"` for cost efficiency, keeping the main session on your preferred model (e.g., Opus) while running the read-heavy session scanning on Haiku.
+The skill launches independent subagents in parallel (one per time block + one for git history + one for browser history). For cost efficiency, subagents should use a lightweight model (e.g., Haiku, GPT-4o-mini) since they perform read-heavy tasks that don't require the strongest model.
 
 The main agent synthesizes their findings — merging cross-block threads, deduplicating overlapping activities, and resolving conflicts.
 
-> **Note:** If your `~/.claude/settings.json` has a global `"model"` override, it will take precedence over the per-subagent `model` parameter. Remove the global override if you want subagents to run on Haiku.
+If your tool doesn't support parallel subagents, the time blocks can be processed sequentially — it just takes longer.
 
 ## How it works
 
@@ -105,7 +112,7 @@ Writes a data JSON file following the schema in `scripts/generate_html.py`, then
 
 ```
 Coding-Day-Recap/
-├── SKILL.md                # Claude Code skill definition
+├── SKILL.md                # Agent Skill definition
 ├── scripts/
 │   ├── generate_html.py    # JSON → HTML generator
 │   ├── pre_extract.py      # Batch CASS session extraction

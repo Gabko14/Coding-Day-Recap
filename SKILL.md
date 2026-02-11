@@ -1,12 +1,11 @@
 ---
 name: day-summary
-description: Generate a visual HTML summary of a day's Claude Code sessions. Requires a date argument (e.g., "today", "yesterday", "2026-02-09"). Gathers CASS session data, reads key sessions, and produces a stunning dark-themed dashboard saved to the Desktop and opened in the browser.
-allowed-tools: Read, Grep, Glob, Bash, Write, Edit, Task, WebFetch, WebSearch
+description: Generate a visual HTML summary of a day's AI coding sessions. Requires a date argument (e.g., "today", "yesterday", "2026-02-09"). Gathers CASS session data, reads key sessions, and produces a stunning dark-themed dashboard saved to the Desktop and opened in the browser.
 ---
 
 # Day Summary Visualization
 
-Generate a comprehensive visual HTML dashboard summarizing a day's Claude Code activity. The output is a self-contained HTML file saved to the user's Desktop and opened in the browser.
+Generate a comprehensive visual HTML dashboard summarizing a day's AI coding activity. The output is a self-contained HTML file saved to the user's Desktop and opened in the browser.
 
 ## Required Argument
 
@@ -18,6 +17,8 @@ A date **must** be provided as the skill argument. Accepted formats:
 If no date argument is provided, **ask the user** which day to visualize. Do not proceed without a date.
 
 ## Workflow
+
+This skill requires [CASS](https://github.com/Dicklesworthstone/coding_agent_session_search) (`pip install cass`).
 
 ### Phase 1: Gather Data & Pre-Extract Sessions
 
@@ -34,25 +35,25 @@ If no date argument is provided, **ask the user** which day to visualize. Do not
 3. **Pre-extract sessions into time-block files** using the pre_extract script. This discovers sessions via `cass timeline --json`, parses `.jsonl` files directly, deduplicates streaming entries, and samples START/MIDDLE/END of each session. Run once per time block:
    ```bash
    # Morning (with stats for the full day)
-   python3 ~/.claude/skills/day-summary/scripts/pre_extract.py \
+   python3 scripts/pre_extract.py \
      --from YYYY-MM-DDT00:00:00 --until YYYY-MM-DDT12:00:00 \
      --output ~/Desktop/day-extract-morning.txt \
      --stats-output ~/Desktop/day-stats-YYYY-MM-DD.json
 
    # Midday
-   python3 ~/.claude/skills/day-summary/scripts/pre_extract.py \
+   python3 scripts/pre_extract.py \
      --from YYYY-MM-DDT12:00:00 --until YYYY-MM-DDT15:00:00 \
      --output ~/Desktop/day-extract-midday.txt
 
    # Afternoon
-   python3 ~/.claude/skills/day-summary/scripts/pre_extract.py \
+   python3 scripts/pre_extract.py \
      --from YYYY-MM-DDT15:00:00 --until YYYY-MM-DDT18:00:00 \
      --output ~/Desktop/day-extract-afternoon.txt
 
    # Evening (extends to 04:00 next day to capture late-night work)
    # Compute the next day's date first:
    # python3 -c "from datetime import datetime,timedelta; print((datetime.strptime('YYYY-MM-DD','%Y-%m-%d')+timedelta(days=1)).strftime('%Y-%m-%d'))"
-   python3 ~/.claude/skills/day-summary/scripts/pre_extract.py \
+   python3 scripts/pre_extract.py \
      --from YYYY-MM-DDT18:00:00 --until NEXT-DAYT04:00:00 \
      --output ~/Desktop/day-extract-evening.txt
    ```
@@ -62,9 +63,9 @@ If no date argument is provided, **ask the user** which day to visualize. Do not
 
 4. **Read the stats JSON** (`~/Desktop/day-stats-YYYY-MM-DD.json`) for workspace breakdown, agent breakdown, session totals, and hourly distribution.
 
-5. **Extract browser history** for the target date. This captures work done outside Claude Code (PR reviews, Jira triage, manual testing, Confluence research, DevOps tools):
+5. **Extract browser history** for the target date. This captures work done outside coding sessions (PR reviews, Jira triage, manual testing, Confluence research, DevOps tools):
    ```bash
-   python3 ~/.claude/skills/day-summary/scripts/browser_history.py \
+   python3 scripts/browser_history.py \
      --date YYYY-MM-DD \
      --output ~/Desktop/browser-history-YYYY-MM-DD.txt
    ```
@@ -87,7 +88,7 @@ This is the most important phase. **Accuracy over speed.** The narrative must re
 
 2. **Trace activities across sessions, not within.** Many activities span multiple sessions. The expert review skill might be used in session A, refined in session B, and validated in session C. Represent these as recurring threads with "spanned all day" tags, not as single-point events.
 
-3. **Read sessions deeply.** Read 10+ sample points across each major session using `cass expand --line N -C 5 "PATH"`. Read the START (what kicked it off), MIDDLE (what it evolved into), and END (what was the outcome). Session titles and openers are often misleading about actual content.
+3. **Read sessions deeply.** The pre-extracted files sample the START, MIDDLE, and END of each session. Session titles and openers are often misleading about actual content — focus on what the conversation actually produced.
 
 4. **Distinguish work types accurately:**
    - "Coded X" = wrote new code from scratch
@@ -105,9 +106,11 @@ This is the most important phase. **Accuracy over speed.** The narrative must re
 
 The `pre_extract.py` script (Phase 1) has already extracted sampled session content into text files — one per time block. Subagents read these files instead of running `cass expand` commands, reducing tool calls from ~10 per subagent to just 1.
 
-**1. Launch subagents in parallel** using the Task tool with `subagent_type: "general-purpose"` and `model: "haiku"` (one per time block + one for git history). Each session-reader prompt should be:
+**1. Launch subagents in parallel** — one per time block, one for git history, and one for browser history. If your tool supports parallel subagents, use them for speed. Use a lightweight/fast model for subagents if available (e.g., Haiku, GPT-4o-mini) to keep costs low — these are read-heavy tasks that don't need the strongest model.
+
+Each **session-reader** subagent prompt should be:
 ```
-Read the file at ~/Desktop/day-extract-morning.txt using the Read tool.
+Read the file at ~/Desktop/day-extract-morning.txt.
 This contains pre-extracted session content from YYYY-MM-DD (morning block).
 For each session in the file, determine:
 - What work was done (coded, reviewed, explored, refined, committed)
@@ -116,13 +119,13 @@ For each session in the file, determine:
 Report your findings concisely, organized by session.
 ```
 
-The git-history subagent is unchanged — it still runs `git log` commands across repos.
+The **git-history** subagent runs `git log` commands across repos found in the stats JSON.
 
-Also launch a **browser-history reader** (`general-purpose`, `model: "haiku"`) in parallel with the others:
+The **browser-history reader** subagent prompt should be:
 ```
-Read the file at ~/Desktop/browser-history-YYYY-MM-DD.txt using the Read tool.
+Read the file at ~/Desktop/browser-history-YYYY-MM-DD.txt.
 This contains browser history with visit durations from YYYY-MM-DD.
-Identify work activities NOT already covered by Claude Code sessions.
+Identify work activities NOT already covered by coding agent sessions.
 Use visit_duration to distinguish meaningful visits (30s+) from noise (0s auth redirects).
 Group repeated visits to the same site/PR/issue into single activities with time ranges.
 Focus on: PR reviews, Jira issues viewed, manual testing (localhost/test envs),
@@ -135,7 +138,7 @@ Report activities concisely with time ranges.
 - **Merging cross-block threads** into single timeline items with time ranges spanning the full duration
 - **Deduplicating** — if morning and afternoon subagents both report "reviewed the same feature", that's one timeline item with a wide time range, not two separate items
 - **Resolving conflicts** — if subagents disagree on what happened, re-read the pre-extracted file yourself to break the tie
-- **Filling gaps with browser data** — the browser-history reader will report activities that happened between Claude sessions (PR reviews, Jira triage, manual testing). Add these to the timeline to give a complete picture of the day. Browser-sourced items should NOT have a `messages` field (since they're not Claude sessions). Use color `text-muted` or a subdued color to visually distinguish them if desired.
+- **Filling gaps with browser data** — the browser-history reader will report activities that happened between coding sessions (PR reviews, Jira triage, manual testing). Add these to the timeline to give a complete picture of the day. Browser-sourced items should NOT have a `messages` field (since they're not coding agent sessions). Use color `text-muted` or a subdued color to visually distinguish them if desired.
 
 #### Timeline Item Schema
 
@@ -174,7 +177,7 @@ Test: if someone reads only the shortName/title, can they tell what was accompli
 
 2. **Run the generator script**:
    ```bash
-   python3 ~/.claude/skills/day-summary/scripts/generate_html.py --data-file ~/Desktop/day-data-YYYY-MM-DD.json --output-file ~/Desktop/day-summary-YYYY-MM-DD.html
+   python3 scripts/generate_html.py --data-file ~/Desktop/day-data-YYYY-MM-DD.json --output-file ~/Desktop/day-summary-YYYY-MM-DD.html
    ```
 
 3. **Clean up intermediate files** — remove the temp files from `~/Desktop/` that were created during Phase 1:
