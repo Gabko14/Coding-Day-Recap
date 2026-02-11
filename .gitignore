@@ -6,3 +6,4 @@
 
 # Override global gitignore — we want beads tracked in this repo
 !.beads/
+.beads/.bv.lock
