@@ -110,7 +110,7 @@ def build_lanes(data, axis_start, axis_span):
         width_pct = round((end_h - start_h) / axis_span * 100, 2)
         bar_color = resolve_color(t["color"])
         delay = round(i * 0.05, 2)
-        short_name = t.get("shortName") or t["title"][:15]
+        short_name = t.get("shortName") or t["title"][:25]
 
         tip_time = f"{t['time']} {ARROW} {t['timeEnd']}" if t.get("timeEnd") else t["time"]
         tip_msgs = f" {DOT} {t['messages']} msgs" if t.get("messages") else ""

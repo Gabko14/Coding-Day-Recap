@@ -84,7 +84,7 @@
   /* Day Map */
   .daymap { position: relative; }
   .daymap-lanes { display: flex; flex-direction: column; gap: 5px; }
-  .lane { display: grid; grid-template-columns: 140px 1fr; gap: 8px; align-items: center; height: 30px; }
+  .lane { display: grid; grid-template-columns: 200px 1fr; gap: 8px; align-items: center; height: 30px; }
   .lane-label { font-size: 11px; font-weight: 400; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; opacity: 0.65; transition: opacity 0.3s; }
   .lane:hover .lane-label { opacity: 1; }
   .lane-track { position: relative; height: 100%; background: var(--surface); border-radius: 4px; overflow: visible; }
@@ -106,7 +106,7 @@
     top: 2px !important; bottom: 2px !important; min-width: 14px; border-radius: 7px;
     box-shadow: 0 0 14px rgba(201,168,76,0.45), 0 0 4px rgba(201,168,76,0.3);
   }
-  .daymap-axis { position: relative; height: 24px; margin-left: 148px; margin-top: 10px; }
+  .daymap-axis { position: relative; height: 24px; margin-left: 208px; margin-top: 10px; }
   .daymap-axis span { position: absolute; transform: translateX(-50%); font-size: 9px; color: var(--text-muted); font-weight: 300; }
 
   @keyframes growRight { from { transform: scaleX(0); } to { transform: scaleX(1); } }
@@ -165,9 +165,9 @@
 
   @media (max-width: 768px) {
     .page { padding: 28px 18px 60px; }
-    .lane { grid-template-columns: 100px 1fr; gap: 6px; height: 26px; }
+    .lane { grid-template-columns: 140px 1fr; gap: 6px; height: 26px; }
     .lane-label { font-size: 9px; }
-    .daymap-axis { margin-left: 106px; }
+    .daymap-axis { margin-left: 148px; }
     .bottom-grid { grid-template-columns: 1fr; gap: 32px; }
     .ws-row { grid-template-columns: 120px 1fr 36px; }
     .stats-inline { flex-direction: column; gap: 6px; }

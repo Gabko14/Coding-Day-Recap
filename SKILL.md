@@ -102,43 +102,39 @@ This is the most important phase. **Accuracy over speed.** The narrative must re
 
 6. **Verify the day of the week.** Never assume. Always compute it.
 
-#### Session Reading Strategy — Pre-Extracted Files + Subagents
+#### Session Reading Strategy — Single Subagent
 
-The `pre_extract.py` script (Phase 1) has already extracted sampled session content into text files — one per time block. Subagents read these files instead of running `cass expand` commands, reducing tool calls from ~10 per subagent to just 1.
+Launch **one subagent** (use a fast, cheap model) to read all pre-extracted files, browser history, and git history. Using a single reader produces a more consistent narrative — it sees activities spanning time blocks naturally and doesn't require cross-block merging or conflict resolution.
 
-**1. Launch subagents in parallel** — one per time block, one for git history, and one for browser history. If your tool supports parallel subagents, use them for speed. Use a lightweight/fast model for subagents if available (e.g., Haiku, GPT-4o-mini) to keep costs low — these are read-heavy tasks that don't need the strongest model.
-
-Each **session-reader** subagent prompt should be:
+The subagent prompt should be:
 ```
-Read the file at ~/Desktop/day-extract-morning.txt.
-This contains pre-extracted session content from YYYY-MM-DD (morning block).
-For each session in the file, determine:
+You are building a timeline of a developer's day on YYYY-MM-DD.
+
+Read these files (in order):
+1. ~/Desktop/day-extract-morning.txt
+2. ~/Desktop/day-extract-midday.txt
+3. ~/Desktop/day-extract-afternoon.txt
+4. ~/Desktop/day-extract-evening.txt
+5. ~/Desktop/browser-history-YYYY-MM-DD.txt
+
+Then run git log for each workspace found in ~/Desktop/day-stats-YYYY-MM-DD.json:
+  git config user.name
+  git -C "<workspace>" log --format="%h %ai %s" --since="YYYY-MM-DD" --until="NEXT-DAY" --all --author="<name>"
+
+For each activity you identify, report:
 - What work was done (coded, reviewed, explored, refined, committed)
+- Time range (start and end)
+- Workspace
 - Key outcomes or artifacts produced
-- Whether this activity clearly continues into another time block
-Report your findings concisely, organized by session.
+- Whether it spans multiple sessions (mark as "spanned" with full time range)
+
+Use git history to distinguish "coded today" from "committed code written earlier."
+Use browser history visit_duration to find work outside coding sessions (30s+ = real work, 0s = noise). Group repeated visits to the same site/PR/issue.
+
+Report as a flat list of activities sorted by time, with no overlap or duplication.
 ```
 
-The **git-history** subagent runs `git log` commands across repos found in the stats JSON.
-
-The **browser-history reader** subagent prompt should be:
-```
-Read the file at ~/Desktop/browser-history-YYYY-MM-DD.txt.
-This contains browser history with visit durations from YYYY-MM-DD.
-Identify work activities NOT already covered by coding agent sessions.
-Use visit_duration to distinguish meaningful visits (30s+) from noise (0s auth redirects).
-Group repeated visits to the same site/PR/issue into single activities with time ranges.
-Focus on: PR reviews, Jira issues viewed, manual testing (localhost/test envs),
-Confluence research, DevOps tools (ArgoCD, Harbor), and time tracking (Tempo).
-Note any non-work browsing as potential break markers.
-Report activities concisely with time ranges.
-```
-
-**2. Synthesize after all subagents return.** You (the main agent) are responsible for:
-- **Merging cross-block threads** into single timeline items with time ranges spanning the full duration
-- **Deduplicating** — if morning and afternoon subagents both report "reviewed the same feature", that's one timeline item with a wide time range, not two separate items
-- **Resolving conflicts** — if subagents disagree on what happened, re-read the pre-extracted file yourself to break the tie
-- **Filling gaps with browser data** — the browser-history reader will report activities that happened between coding sessions (PR reviews, Jira triage, manual testing). Add these to the timeline to give a complete picture of the day. Browser-sourced items should NOT have a `messages` field (since they're not coding agent sessions). Use color `text-muted` or a subdued color to visually distinguish them if desired.
+After the subagent returns, the main agent uses its findings to build the timeline. Browser-sourced items should NOT have a `messages` field and should use a subdued color to visually distinguish them.
 
 #### Timeline Item Schema
 
@@ -146,8 +142,8 @@ Group activities into logical threads. For each timeline item, capture:
 - **time** — "HH:MM" when it started
 - **timeEnd** — "HH:MM" when it ended (omit for point events like a single commit)
 - **messages** — number of messages in that activity (optional, shown as badge)
-- **shortName** — short label for the Day Map swimlane (max 15 chars, e.g., "Calendar fix"). Must describe the ACTIVITY, not the session metadata. See naming rules below.
-- **title** — full descriptive name. Must describe the ACTIVITY, not the session metadata. See naming rules below.
+- **shortName** — label for the Day Map swimlane (max 25 chars, e.g., "Fix calendar next-meeting"). Must describe the ACTIVITY, not the session metadata. See naming rules below.
+- **title** — full descriptive name (same naming rules as shortName, but can be longer)
 - **description** — 2-3 sentences of what ACTUALLY happened (not what the title suggests)
 - **color** — CSS variable: `accent` (purple), `warm` (orange), `success` (green), `danger` (red), `blue`, `cyan`, `gold` (for commits)
 - **tags** — array of `{ "text": "...", "color": "..." }` — category labels + "spanned all day" where applicable

@@ -82,11 +82,9 @@ The skill will:
 
 ## Subagent Architecture
 
-The skill launches independent subagents in parallel (one per time block + one for git history + one for browser history). For cost efficiency, subagents should use a lightweight model (e.g., Haiku, GPT-4o-mini) since they perform read-heavy tasks that don't require the strongest model.
+The skill launches a single subagent to read all pre-extracted session files, browser history, and git history. Using one reader instead of many produces a more consistent narrative — it sees activities spanning time blocks naturally without needing cross-block merging or conflict resolution.
 
-The main agent synthesizes their findings — merging cross-block threads, deduplicating overlapping activities, and resolving conflicts.
-
-If your tool doesn't support parallel subagents, the time blocks can be processed sequentially — it just takes longer.
+The main agent then uses the subagent's findings to build the final timeline and generate HTML.
 
 ## How it works
 
@@ -94,7 +92,7 @@ If your tool doesn't support parallel subagents, the time blocks can be processe
 Runs CASS queries to gather session counts, hourly distribution, workspace/agent breakdowns.
 
 ### Phase 2: Narrative Building
-The critical phase. Launches independent subagents in parallel — one per time block (morning, midday, afternoon, evening) plus a git history checker and a browser history reader. Each reader uses pre-extracted session data to deeply read sessions at multiple points. The main agent synthesizes findings — merging cross-block threads, deduplicating overlapping activities, resolving conflicts.
+The critical phase. A single subagent reads all pre-extracted session data, browser history, and git history to build a complete picture of the day. Using one reader produces consistent results — it sees activities spanning time blocks naturally without needing cross-block merging.
 
 Key accuracy rules:
 - **Check git history** to distinguish "coded today" from "committed code written last week"
