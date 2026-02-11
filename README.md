@@ -7,7 +7,7 @@ A [Claude Code](https://docs.anthropic.com/en/docs/claude-code) skill that gener
 ## What it does
 
 1. **Gathers quantitative data** — session counts, hourly activity distribution, workspace breakdown, agent breakdown
-2. **Reads sessions deeply** — launches parallel haiku subagents to read the START, MIDDLE, and END of each significant session
+2. **Reads sessions deeply** — launches parallel subagents to read the START, MIDDLE, and END of each significant session
 3. **Builds an accurate narrative** — distinguishes "coded" from "reviewed" from "committed", traces activity threads across sessions, checks git history for ground truth
 4. **Generates an HTML dashboard** — dark-themed, self-contained, with a Day Map swimlane visualization, journal feed, workspace breakdown, and a hero stat
 
@@ -23,22 +23,29 @@ A [Claude Code](https://docs.anthropic.com/en/docs/claude-code) skill that gener
 
 ## Installation
 
-1. Clone this repo:
+1. Install [CASS](https://github.com/Dicklesworthstone/coding_agent_session_search) and index your sessions:
+   ```bash
+   pip install cass
+   cass index
+   ```
+
+2. Clone this repo:
    ```bash
    git clone https://github.com/Gabko14/Coding-Day-Recap.git
    ```
 
-2. Copy or symlink to your Claude Code skills directory:
+3. Symlink to your Claude Code skills directory:
    ```bash
+   # Create skills directory if it doesn't exist
+   mkdir -p ~/.claude/skills
+
    # macOS / Linux (symlink — stays in sync with git pulls)
-   ln -s /path/to/day-summary ~/.claude/skills/day-summary
+   ln -s /path/to/Coding-Day-Recap ~/.claude/skills/day-summary
    ```
    ```powershell
    # Windows (junction — stays in sync with git pulls)
-   New-Item -ItemType Junction -Path "$HOME\.claude\skills\day-summary" -Target "C:\path\to\day-summary"
+   New-Item -ItemType Junction -Path "$HOME\.claude\skills\day-summary" -Target "C:\path\to\Coding-Day-Recap"
    ```
-
-3. Run the skill once — it will auto-create a `haiku-reader` agent at `~/.claude/agents/haiku-reader.md` for cost-efficient session reading. After the first run, reload agents with `/agents` or restart your session.
 
 4. Verify the skill appears in Claude Code:
    ```
@@ -57,18 +64,18 @@ In Claude Code, invoke the skill with a date:
 
 The skill will:
 1. Index your CASS data
-2. Launch parallel haiku subagents to deeply read your sessions
+2. Launch parallel subagents to deeply read your sessions
 3. Synthesize findings into a coherent timeline
 4. Generate an HTML dashboard on your Desktop
 5. Open it in your browser
 
-## Haiku Readers
+## Subagent Architecture
 
-Session readers use a custom **Haiku-based agent** (`haiku-reader`) for cost efficiency. The skill auto-creates this agent at `~/.claude/agents/haiku-reader.md` on first run. This keeps the main session on your preferred model (e.g., Opus) while running the read-heavy session scanning on Haiku — significantly reducing token costs.
+The skill launches independent subagents in parallel (one per time block + one for git history + one for browser history). Each subagent uses `model: "haiku"` for cost efficiency, keeping the main session on your preferred model (e.g., Opus) while running the read-heavy session scanning on Haiku.
 
-The skill launches independent haiku subagents in parallel (one per time block + one for git history). The main agent synthesizes their findings — merging cross-block threads, deduplicating overlapping activities, and resolving conflicts.
+The main agent synthesizes their findings — merging cross-block threads, deduplicating overlapping activities, and resolving conflicts.
 
-> **Why not agent teams?** Agent teams (`TeamCreate`) would allow readers to cross-reference findings, but currently don't respect custom agent model overrides — teammates always run on the global model regardless of the `haiku-reader` definition. Independent subagents correctly use Haiku.
+> **Note:** If your `~/.claude/settings.json` has a global `"model"` override, it will take precedence over the per-subagent `model` parameter. Remove the global override if you want subagents to run on Haiku.
 
 ## How it works
 
@@ -76,7 +83,7 @@ The skill launches independent haiku subagents in parallel (one per time block +
 Runs CASS queries to gather session counts, hourly distribution, workspace/agent breakdowns.
 
 ### Phase 2: Narrative Building
-The critical phase. Launches independent haiku subagents in parallel — one per time block (morning, afternoon, evening) plus a git history checker. Each reader uses `cass expand` to deeply read sessions at multiple points. The main agent synthesizes findings — merging cross-block threads, deduplicating overlapping activities, resolving conflicts.
+The critical phase. Launches independent subagents in parallel — one per time block (morning, midday, afternoon, evening) plus a git history checker and a browser history reader. Each reader uses pre-extracted session data to deeply read sessions at multiple points. The main agent synthesizes findings — merging cross-block threads, deduplicating overlapping activities, resolving conflicts.
 
 Key accuracy rules:
 - **Check git history** to distinguish "coded today" from "committed code written last week"
@@ -93,15 +100,16 @@ Writes a data JSON file following the schema in `scripts/generate_html.py`, then
 ## File Structure
 
 ```
-day-summary/
-├── SKILL.md              # Claude Code skill definition
+Coding-Day-Recap/
+├── SKILL.md                # Claude Code skill definition
 ├── scripts/
-│   ├── generate_html.py  # JSON → HTML generator (Python)
-│   └── setup_agent.py    # Creates haiku-reader agent definition
+│   ├── generate_html.py    # JSON → HTML generator
+│   ├── pre_extract.py      # Batch CASS session extraction
+│   └── browser_history.py  # Browser history extraction (Chrome/Edge)
 ├── assets/
-│   └── template.html     # HTML/CSS template
+│   └── template.html       # HTML/CSS template
 ├── examples/
-│   └── screenshot.png    # Example dashboard
+│   └── screenshot.png      # Example dashboard
 ├── LICENSE
 └── README.md
 ```
