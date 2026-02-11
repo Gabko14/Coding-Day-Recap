@@ -50,11 +50,13 @@ If no date argument is provided, **ask the user** which day to visualize. Do not
      --output ~/Desktop/day-extract-afternoon.txt
 
    # Evening (extends to 04:00 next day to capture late-night work)
+   # Compute the next day's date first:
+   # python3 -c "from datetime import datetime,timedelta; print((datetime.strptime('YYYY-MM-DD','%Y-%m-%d')+timedelta(days=1)).strftime('%Y-%m-%d'))"
    python3 ~/.claude/skills/day-summary/scripts/pre_extract.py \
-     --from YYYY-MM-DDT18:00:00 --until YYYY-MM-DD+1T04:00:00 \
+     --from YYYY-MM-DDT18:00:00 --until NEXT-DAYT04:00:00 \
      --output ~/Desktop/day-extract-evening.txt
    ```
-   Replace `YYYY-MM-DD+1` with the actual next day's date (e.g., `2026-02-10T04:00:00` for Feb 9).
+   Replace `NEXT-DAY` with the computed next day's date (e.g., for `2026-02-09`, use `2026-02-10T04:00:00`).
 
    The `--stats-output` flag (only needed once) produces a JSON file with workspace/agent breakdowns, total sessions, and hourly distribution.
 
@@ -79,7 +81,7 @@ This is the most important phase. **Accuracy over speed.** The narrative must re
    # Get the user's git author name
    git config user.name
    # Then use it to filter
-   git -C "<repo>" log --format="%h %ai %s" --since="YYYY-MM-DD" --until="YYYY-MM-DD+1" --all --author="<name>"
+   git -C "<repo>" log --format="%h %ai %s" --since="YYYY-MM-DD" --until="NEXT-DAY" --all --author="<name>"
    ```
    Also check the previous few days for context. If today has one commit but the code existed before, the day was about REVIEWING/COMMITTING, not coding.
 
