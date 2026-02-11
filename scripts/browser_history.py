@@ -11,6 +11,7 @@ Usage:
 
 import argparse
 import os
+import platform
 import shutil
 import sqlite3
 import sys
@@ -23,11 +24,24 @@ CHROMIUM_EPOCH_OFFSET = 11644473600 * 1_000_000
 # Insert a gap marker when visits are more than this many seconds apart
 GAP_THRESHOLD_SECONDS = 30 * 60  # 30 minutes
 
-# Browser history DB paths (Edge first, Chrome fallback)
-BROWSER_PATHS = [
-    ("Edge", Path.home() / "AppData/Local/Microsoft/Edge/User Data/Default/History"),
-    ("Chrome", Path.home() / "AppData/Local/Google/Chrome/User Data/Default/History"),
-]
+# Browser history DB paths per platform (Edge first, Chrome fallback)
+_system = platform.system()
+if _system == "Darwin":
+    BROWSER_PATHS = [
+        ("Edge", Path.home() / "Library/Application Support/Microsoft Edge/Default/History"),
+        ("Chrome", Path.home() / "Library/Application Support/Google/Chrome/Default/History"),
+    ]
+elif _system == "Linux":
+    BROWSER_PATHS = [
+        ("Edge", Path.home() / ".config/microsoft-edge/Default/History"),
+        ("Chrome", Path.home() / ".config/google-chrome/Default/History"),
+        ("Chromium", Path.home() / ".config/chromium/Default/History"),
+    ]
+else:  # Windows
+    BROWSER_PATHS = [
+        ("Edge", Path.home() / "AppData/Local/Microsoft/Edge/User Data/Default/History"),
+        ("Chrome", Path.home() / "AppData/Local/Google/Chrome/User Data/Default/History"),
+    ]
 
 
 def find_browser_history():
