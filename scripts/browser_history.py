@@ -80,8 +80,9 @@ def format_duration(microseconds):
 def extract_history(db_path, date_str):
     """Extrahiere alle Besuche fuer ein bestimmtes Datum."""
     date = datetime.strptime(date_str, "%Y-%m-%d")
-    day_start = datetime(date.year, date.month, date.day, tzinfo=timezone.utc)
-    day_end = datetime(date.year, date.month, date.day, 23, 59, 59, tzinfo=timezone.utc)
+    # Use local timezone for day boundaries so "today" means the user's local day
+    day_start = datetime(date.year, date.month, date.day).astimezone()
+    day_end = datetime(date.year, date.month, date.day, 23, 59, 59).astimezone()
 
     ts_start = chromium_ts(day_start)
     ts_end = chromium_ts(day_end)
