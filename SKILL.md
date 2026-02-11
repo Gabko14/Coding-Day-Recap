@@ -70,6 +70,14 @@ If the agent was just created, tell the user to run `/agents` or restart the ses
 
 4. **Read the stats JSON** (`~/Desktop/day-stats-YYYY-MM-DD.json`) for workspace breakdown, agent breakdown, session totals, and hourly distribution.
 
+5. **Extract browser history** for the target date. This captures work done outside Claude Code (PR reviews, Jira triage, manual testing, Confluence research, DevOps tools):
+   ```bash
+   python3 ~/.claude/skills/day-summary/scripts/browser_history.py \
+     --date YYYY-MM-DD \
+     --output ~/Desktop/browser-history-YYYY-MM-DD.txt
+   ```
+   The script queries the Chromium `visits` table (Edge or Chrome) and outputs every page visit with `visit_duration` — the time spent on each page. Auth redirects show 0s, real work shows 30s+. Gap markers are inserted for 30+ minute gaps. If no browser is found, it writes an empty file and exits cleanly.
+
 ### Phase 2: Build Accurate Narrative (CRITICAL)
 
 This is the most important phase. **Accuracy over speed.** The narrative must reflect what ACTUALLY happened, not what session titles suggest.
@@ -118,10 +126,24 @@ Report your findings concisely, organized by session.
 
 The git-history subagent is unchanged — it still runs `git log` commands across repos.
 
+Also launch a **browser-history reader** (haiku-reader) in parallel with the others:
+```
+Read the file at ~/Desktop/browser-history-YYYY-MM-DD.txt using the Read tool.
+This contains browser history with visit durations from YYYY-MM-DD.
+Identify work activities NOT already covered by Claude Code sessions.
+Use visit_duration to distinguish meaningful visits (30s+) from noise (0s auth redirects).
+Group repeated visits to the same site/PR/issue into single activities with time ranges.
+Focus on: PR reviews, Jira issues viewed, manual testing (localhost/test envs),
+Confluence research, DevOps tools (ArgoCD, Harbor), and time tracking (Tempo).
+Note any non-work browsing as potential break markers.
+Report activities concisely with time ranges.
+```
+
 **2. Synthesize after all subagents return.** You (the main agent) are responsible for:
 - **Merging cross-block threads** into single timeline items with time ranges spanning the full duration
 - **Deduplicating** — if morning and afternoon subagents both report "reviewed the same feature", that's one timeline item with a wide time range, not two separate items
 - **Resolving conflicts** — if subagents disagree on what happened, re-read the pre-extracted file yourself to break the tie
+- **Filling gaps with browser data** — the browser-history reader will report activities that happened between Claude sessions (PR reviews, Jira triage, manual testing). Add these to the timeline to give a complete picture of the day. Browser-sourced items should NOT have a `messages` field (since they're not Claude sessions). Use color `text-muted` or a subdued color to visually distinguish them if desired.
 
 #### Timeline Item Schema
 
