@@ -15,6 +15,7 @@ import platform
 import shutil
 import sqlite3
 import sys
+import tempfile
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -87,35 +88,39 @@ def extract_history(db_path, date_str):
     ts_start = chromium_ts(day_start)
     ts_end = chromium_ts(day_end)
 
-    # Kopie erstellen, da der Browser die DB sperrt
-    tmp_path = Path.home() / "Desktop" / "browser_history_tmp.db"
+    # Copy DB to temp file because the browser locks it while running
+    tmp_fd, tmp_path = tempfile.mkstemp(suffix=".db", prefix="browser_history_")
+    os.close(tmp_fd)
     try:
         shutil.copy2(db_path, tmp_path)
     except (PermissionError, OSError) as e:
         print(f"Warning: Could not copy browser history ({e}). Browser might be locking it.", file=sys.stderr)
         print("Try closing the browser or copying the file manually.", file=sys.stderr)
+        os.unlink(tmp_path)
         return None, 0, 0
 
-    conn = sqlite3.connect(str(tmp_path))
-    cur = conn.cursor()
+    try:
+        conn = sqlite3.connect(tmp_path)
+        cur = conn.cursor()
 
-    cur.execute(
-        """
-        SELECT v.visit_time, v.visit_duration, u.url, u.title
-        FROM visits v
-        JOIN urls u ON v.url = u.id
-        WHERE v.visit_time >= ? AND v.visit_time < ?
-        ORDER BY v.visit_time ASC
-        """,
-        (ts_start, ts_end),
-    )
-    rows = cur.fetchall()
+        cur.execute(
+            """
+            SELECT v.visit_time, v.visit_duration, u.url, u.title
+            FROM visits v
+            JOIN urls u ON v.url = u.id
+            WHERE v.visit_time >= ? AND v.visit_time < ?
+            ORDER BY v.visit_time ASC
+            """,
+            (ts_start, ts_end),
+        )
+        rows = cur.fetchall()
 
-    # Eindeutige URLs zaehlen
-    unique_urls = len(set(r[2] for r in rows))
+        unique_urls = len(set(r[2] for r in rows))
 
-    conn.close()
-    return rows, len(rows), unique_urls
+        conn.close()
+        return rows, len(rows), unique_urls
+    finally:
+        os.unlink(tmp_path)
 
 
 def write_output(rows, total, unique, browser_name, date_str, output_path):

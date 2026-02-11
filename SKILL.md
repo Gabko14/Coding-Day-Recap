@@ -175,9 +175,17 @@ Test: if someone reads only the shortName/title, can they tell what was accompli
    python3 ~/.claude/skills/day-summary/scripts/generate_html.py --data-file ~/Desktop/day-data-YYYY-MM-DD.json --output-file ~/Desktop/day-summary-YYYY-MM-DD.html
    ```
 
-3. **Open in browser** using the platform's default command (`open` on macOS, `xdg-open` on Linux, `Start-Process` on Windows).
+3. **Clean up intermediate files** — remove the temp files from `~/Desktop/` that were created during Phase 1:
+   ```bash
+   rm -f ~/Desktop/day-extract-morning.txt ~/Desktop/day-extract-midday.txt \
+         ~/Desktop/day-extract-afternoon.txt ~/Desktop/day-extract-evening.txt \
+         ~/Desktop/day-stats-YYYY-MM-DD.json ~/Desktop/browser-history-YYYY-MM-DD.txt \
+         ~/Desktop/day-data-YYYY-MM-DD.json
+   ```
 
-4. **Present a text summary** as well — key stats and activity list.
+4. **Open in browser** using the platform's default command (`open` on macOS, `xdg-open` on Linux, `Start-Process` on Windows).
+
+5. **Present a text summary** as well — key stats and activity list.
 
 ### Headline Guidelines
 
