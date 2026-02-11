@@ -21,6 +21,10 @@ A [Claude Code](https://docs.anthropic.com/en/docs/claude-code) skill that gener
 
 **macOS, Linux, Windows** — all scripts are Python, no platform-specific dependencies.
 
+## What is a Claude Code Skill?
+
+A [skill](https://docs.anthropic.com/en/docs/claude-code/skills) is a reusable prompt that extends Claude Code with specialized capabilities. Skills live in `~/.claude/skills/` and are defined by a `SKILL.md` file. Once installed, you invoke them with `/skill-name` in any Claude Code session (e.g., `/day-summary today`).
+
 ## Installation
 
 1. Install [CASS](https://github.com/Dicklesworthstone/coding_agent_session_search) and index your sessions:
