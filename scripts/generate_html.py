@@ -120,7 +120,7 @@ def build_lanes(data, axis_start, axis_span):
         width_style = "min-width:14px" if width_pct < 2 else f"width:{width_pct}%"
 
         html += (
-            f'        <div class="lane">\n'
+            f'        <div class="lane" data-target="event-{i}">\n'
             f'          <div class="lane-label" style="color:{bar_color}">{short_name}</div>\n'
             f'          <div class="lane-track">\n'
             f'            <div class="lane-bar{commit_class}" style="left:{left_pct}%;{width_style};background:{bar_color};animation-delay:{delay}s" data-tip="{tip_text}"></div>\n'
@@ -141,7 +141,7 @@ def build_axis(axis_start, axis_end, axis_span):
 
 def build_journal(data):
     html = ""
-    for t in data["timeline"]:
+    for i, t in enumerate(data["timeline"]):
         ev_color = resolve_color(t["color"])
 
         span_class = ""
@@ -172,7 +172,7 @@ def build_journal(data):
             tags_html += f'          <span class="tag" style="color:{tc};border-color:{tb}">{tag["text"]}</span>\n'
 
         html += (
-            f'      <article class="event{span_class} reveal" style="--ev-color:{ev_color}">\n'
+            f'      <article id="event-{i}" class="event{span_class} reveal" style="--ev-color:{ev_color}">\n'
             f'        <div class="event-meta">\n'
             f'          <time class="event-time">{time_display}</time>\n'
             f'          {msgs_html}\n'

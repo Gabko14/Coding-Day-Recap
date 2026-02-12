@@ -87,6 +87,7 @@
   .lane { display: grid; grid-template-columns: 200px 1fr; gap: 8px; align-items: center; height: 30px; }
   .lane-label { font-size: 11px; font-weight: 400; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; opacity: 0.65; transition: opacity 0.3s; }
   .lane:hover .lane-label { opacity: 1; }
+  .lane[data-target] { cursor: pointer; }
   .lane-track { position: relative; height: 100%; background: var(--surface); border-radius: 4px; overflow: visible; }
   .lane:nth-child(even) .lane-track { background: rgba(18,17,14,0.6); }
   .lane-bar {
@@ -120,6 +121,11 @@
     transition: background 0.3s, transform 0.3s;
   }
   .event:hover { background: var(--surface-2); transform: translateX(3px); }
+  .event.flash { animation: eventFlash 1.4s ease-out; }
+  @keyframes eventFlash {
+    0% { background: var(--surface-3); border-left-color: var(--gold); }
+    100% { background: var(--surface); }
+  }
   .event.spanning { border-left-width: 5px; }
   .event-meta { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 10px; }
   .event-time { font-size: 11px; color: var(--text-muted); }
@@ -242,6 +248,19 @@ const observer = new IntersectionObserver((entries) => {
   });
 }, { threshold: 0.08, rootMargin: '0px 0px -30px 0px' });
 document.querySelectorAll('.reveal').forEach(el => observer.observe(el));
+
+// Day Map → Journal scroll linking
+document.querySelectorAll('.lane[data-target]').forEach(lane => {
+  lane.addEventListener('click', () => {
+    const target = document.getElementById(lane.dataset.target);
+    if (!target) return;
+    target.classList.add('visible'); // ensure reveal has fired
+    target.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    target.classList.remove('flash');
+    void target.offsetWidth; // reflow to restart animation
+    target.classList.add('flash');
+  });
+});
 </script>
 
 </body>
