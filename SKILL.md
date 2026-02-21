@@ -71,6 +71,24 @@ This skill requires [CASS](https://github.com/Dicklesworthstone/coding_agent_ses
    ```
    The script queries the Chromium `visits` table (Edge or Chrome) and outputs every page visit with `visit_duration` — the time spent on each page. Auth redirects show 0s, real work shows 30s+. Gap markers are inserted for 30+ minute gaps. If no browser is found, it writes an empty file and exits cleanly.
 
+6. **Extract calendar events** for the target date. This captures meetings, routines, and all-day events from the system calendar (Exchange, Google, iCloud, etc.):
+   ```bash
+   python3 scripts/calendar_events.py \
+     --date YYYY-MM-DD \
+     --output ~/Desktop/calendar-YYYY-MM-DD.txt
+   ```
+   On macOS, the script compiles a Swift EventKit CLI (cached after first run) that reads from the system Calendar app. It outputs all timed events sorted chronologically, all-day events, and a CALENDARS FOUND summary. On other platforms, it writes an empty file and continues.
+
+7. **Calendar selection.** Read the CALENDARS FOUND section from the calendar output file. Present the user with the list of calendars grouped by type and ask which to include:
+   ```
+   I found these calendars:
+     Work: Kalender (Exchange, 3 events)
+     Personal: Current Routine (Google, 5 events), Family (Google, 0 events)
+     Holidays: United States holidays (1 all-day), Schweizerische Feiertage (1 all-day)
+   Which should I include? [suggest Exchange calendars as default]
+   ```
+   Use the user's selection when building the Phase 2 subagent prompt — only pass events from the selected calendars. If the agent platform supports persistent memory, save the user's preference so future runs skip this step. If the calendar output is empty or says "none", skip this step entirely — the skill continues without calendar data.
+
 ### Phase 2: Build Accurate Narrative (CRITICAL)
 
 This is the most important phase. **Accuracy over speed.** The narrative must reflect what ACTUALLY happened, not what session titles suggest.
@@ -116,6 +134,7 @@ Read these files (in order):
 3. ~/Desktop/day-extract-afternoon.txt
 4. ~/Desktop/day-extract-evening.txt
 5. ~/Desktop/browser-history-YYYY-MM-DD.txt
+6. ~/Desktop/calendar-YYYY-MM-DD.txt
 
 Then run git log for each workspace found in ~/Desktop/day-stats-YYYY-MM-DD.json:
   git config user.name
@@ -131,6 +150,12 @@ For each activity you identify, report:
 Use git history to distinguish "coded today" from "committed code written earlier."
 Use browser history visit_duration to find work outside coding sessions (30s+ = real work, 0s = noise). Group repeated visits to the same site/PR/issue.
 
+The user selected these calendars for inclusion: [CALENDAR_SELECTION].
+Use calendar events from these calendars to explain gaps between coding sessions.
+A 2-hour gap with a Sprint Planning meeting is not idle time — it's meeting time.
+Report meetings as activities with isMeeting=true. All-day events (holidays) are
+background context — note them but don't create timeline items for them.
+
 Report as a flat list of activities sorted by time, with no overlap or duplication.
 ```
 
@@ -145,9 +170,10 @@ Group activities into logical threads. For each timeline item, capture:
 - **shortName** — label for the Day Map swimlane (max 25 chars, e.g., "Fix calendar next-meeting"). Must describe the ACTIVITY, not the session metadata. See naming rules below.
 - **title** — full descriptive name (same naming rules as shortName, but can be longer)
 - **description** — 2-3 sentences of what ACTUALLY happened (not what the title suggests)
-- **color** — CSS variable: `accent` (purple), `warm` (orange), `success` (green), `danger` (red), `blue`, `cyan`, `gold` (for commits)
+- **color** — CSS variable: `accent` (purple), `warm` (orange), `success` (green), `danger` (red), `blue`, `cyan`, `gold` (for commits), `meeting` (desaturated slate, for calendar meetings)
 - **tags** — array of `{ "text": "...", "color": "..." }` — category labels + "spanned all day" where applicable
 - **isCommit** — `true` for the commit event (renders with gold glow marker in Day Map)
+- **isMeeting** — `true` for calendar meetings (renders as muted background layer in Day Map)
 
 #### Naming Rules for shortName and title
 
@@ -181,7 +207,7 @@ Test: if someone reads only the shortName/title, can they tell what was accompli
    rm -f ~/Desktop/day-extract-morning.txt ~/Desktop/day-extract-midday.txt \
          ~/Desktop/day-extract-afternoon.txt ~/Desktop/day-extract-evening.txt \
          ~/Desktop/day-stats-YYYY-MM-DD.json ~/Desktop/browser-history-YYYY-MM-DD.txt \
-         ~/Desktop/day-data-YYYY-MM-DD.json
+         ~/Desktop/calendar-YYYY-MM-DD.txt ~/Desktop/day-data-YYYY-MM-DD.json
    ```
 
 4. **Open in browser** using the platform's default command (`open` on macOS, `xdg-open` on Linux, `Start-Process` on Windows).

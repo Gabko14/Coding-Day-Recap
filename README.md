@@ -112,9 +112,11 @@ Writes a data JSON file following the schema in `scripts/generate_html.py`, then
 Coding-Day-Recap/
 ├── SKILL.md                # Agent Skill definition
 ├── scripts/
-│   ├── generate_html.py    # JSON → HTML generator
-│   ├── pre_extract.py      # Batch CASS session extraction
-│   └── browser_history.py  # Browser history extraction (Chrome/Edge)
+│   ├── generate_html.py        # JSON → HTML generator
+│   ├── pre_extract.py          # Batch CASS session extraction
+│   ├── browser_history.py      # Browser history extraction (Chrome/Edge)
+│   ├── calendar_events.py      # Calendar event extraction (macOS)
+│   └── calendar_eventkit.swift # Swift EventKit backend
 ├── assets/
 │   └── template.html       # HTML/CSS template
 ├── examples/

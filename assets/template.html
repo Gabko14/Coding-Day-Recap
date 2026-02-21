@@ -26,6 +26,8 @@
     --cyan: #5ccec4;
     --gold: #c9a84c;
     --gold-dim: #8a7430;
+    --meeting: #7a8f99;
+    --meeting-dim: #536570;
   }
 
   *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
@@ -107,6 +109,13 @@
     top: 2px !important; bottom: 2px !important; min-width: 14px; border-radius: 7px;
     box-shadow: 0 0 14px rgba(201,168,76,0.45), 0 0 4px rgba(201,168,76,0.3);
   }
+
+  /* Meeting lanes — muted background layer */
+  .meeting-lane { height: 24px; }
+  .meeting-lane .lane-label { font-size: 10px; opacity: 0.4; }
+  .meeting-lane:hover .lane-label { opacity: 0.7; }
+  .meeting-bar { opacity: 0.25 !important; border-radius: 2px !important; top: 5px !important; bottom: 5px !important; }
+  .meeting-bar:hover { opacity: 0.45 !important; }
   .daymap-axis { position: relative; height: 24px; margin-left: 208px; margin-top: 10px; }
   .daymap-axis span { position: absolute; transform: translateX(-50%); font-size: 9px; color: var(--text-muted); font-weight: 300; }
 
@@ -127,6 +136,9 @@
     100% { background: var(--surface); }
   }
   .event.spanning { border-left-width: 5px; }
+  .event.meeting { background: rgba(18,17,14,0.6); border-left-style: dashed; }
+  .event.meeting .event-title { font-size: 16px; color: var(--text-dim); }
+  .event.meeting .event-desc { color: var(--text-muted); }
   .event-meta { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 10px; }
   .event-time { font-size: 11px; color: var(--text-muted); }
   .event-msgs { font-size: 10px; color: var(--text-muted); background: var(--surface-3); padding: 2px 8px; border-radius: 10px; }

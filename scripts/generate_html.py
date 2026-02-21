@@ -22,7 +22,8 @@
 #       "description": "Fixed the next-meeting countdown...",
 #       "color": "warm",
 #       "tags": [ { "text": "bugfix", "color": "warm" } ],
-#       "isCommit": false
+#       "isCommit": false,
+#       "isMeeting": false
 #     }
 #   ],
 #   "workspaces": [
@@ -50,6 +51,7 @@ COLOR_MAP = {
     "success": "var(--success)", "danger": "var(--danger)",
     "blue": "var(--blue)", "cyan": "var(--cyan)",
     "gold": "var(--gold)", "gold-dim": "var(--gold-dim)",
+    "meeting": "var(--meeting)", "meeting-dim": "var(--meeting-dim)",
     "text-muted": "var(--text-muted)",
 }
 
@@ -57,7 +59,8 @@ BORDER_MAP = {
     "accent": "var(--accent-dim)", "warm": "var(--warm-dim)",
     "success": "rgba(94,194,149,0.3)", "danger": "rgba(224,84,105,0.3)",
     "blue": "rgba(91,155,232,0.3)", "cyan": "rgba(92,206,196,0.3)",
-    "gold": "var(--gold-dim)", "text-muted": "var(--border)",
+    "gold": "var(--gold-dim)", "meeting": "rgba(122,143,153,0.3)",
+    "text-muted": "var(--border)",
 }
 
 
@@ -102,8 +105,37 @@ def build_stats(data):
 
 
 def build_lanes(data, axis_start, axis_span):
+    # Separate meetings from activities — meetings render first as background layer
+    meetings = [(i, t) for i, t in enumerate(data["timeline"]) if t.get("isMeeting")]
+    activities = [(i, t) for i, t in enumerate(data["timeline"]) if not t.get("isMeeting")]
+
     html = ""
-    for i, t in enumerate(data["timeline"]):
+
+    # Meeting lanes (background layer, muted)
+    for i, t in meetings:
+        start_h = parse_time(t["time"])
+        end_h = parse_time(t["timeEnd"]) if t.get("timeEnd") else start_h + 0.25
+        left_pct = round((start_h - axis_start) / axis_span * 100, 2)
+        width_pct = round((end_h - start_h) / axis_span * 100, 2)
+        bar_color = resolve_color(t["color"])
+        delay = round(i * 0.05, 2)
+        short_name = t.get("shortName") or t["title"][:25]
+
+        tip_time = f"{t['time']} {ARROW} {t['timeEnd']}" if t.get("timeEnd") else t["time"]
+        tip_text = tip_time
+        width_style = "min-width:14px" if width_pct < 2 else f"width:{width_pct}%"
+
+        html += (
+            f'        <div class="lane meeting-lane" data-target="event-{i}">\n'
+            f'          <div class="lane-label" style="color:{bar_color}">{short_name}</div>\n'
+            f'          <div class="lane-track">\n'
+            f'            <div class="lane-bar meeting-bar" style="left:{left_pct}%;{width_style};background:{bar_color};animation-delay:{delay}s" data-tip="{tip_text}"></div>\n'
+            f'          </div>\n'
+            f'        </div>\n'
+        )
+
+    # Activity lanes (foreground, normal rendering)
+    for i, t in activities:
         start_h = parse_time(t["time"])
         end_h = parse_time(t["timeEnd"]) if t.get("timeEnd") else start_h + 0.25
         left_pct = round((start_h - axis_start) / axis_span * 100, 2)
@@ -145,9 +177,11 @@ def build_journal(data):
         ev_color = resolve_color(t["color"])
 
         span_class = ""
+        if t.get("isMeeting"):
+            span_class = " meeting"
         for tag in t.get("tags", []):
             if tag["text"] == "spanned all day":
-                span_class = " spanning"
+                span_class += " spanning"
                 break
 
         start_h = parse_time(t["time"])
