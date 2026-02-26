@@ -71,23 +71,32 @@ This skill requires [CASS](https://github.com/Dicklesworthstone/coding_agent_ses
    ```
    The script queries the Chromium `visits` table (Edge or Chrome) and outputs every page visit with `visit_duration` — the time spent on each page. Auth redirects show 0s, real work shows 30s+. Gap markers are inserted for 30+ minute gaps. If no browser is found, it writes an empty file and exits cleanly.
 
-6. **Extract calendar events** for the target date. This captures meetings, routines, and all-day events from the system calendar (Exchange, Google, iCloud, etc.):
+6. **Discover calendars** for the target date. The script lists all available calendars with event counts:
    ```bash
    python3 scripts/calendar_events.py \
      --date YYYY-MM-DD \
-     --output ~/Desktop/calendar-YYYY-MM-DD.txt
+     --list-calendars
    ```
-   On macOS, the script compiles a Swift EventKit CLI (cached after first run) that reads from the system Calendar app. On Windows, it runs a PowerShell script that queries Outlook via COM automation (works with Exchange, Microsoft 365, and local calendars). Both produce the same output format: timed events sorted chronologically, all-day events, and a CALENDARS FOUND summary. On Linux, it writes an empty file and continues.
+   On macOS, this uses a Swift EventKit CLI. On Windows, it queries Outlook via COM automation. On Linux, it reports no calendars and the skill continues without calendar data.
 
-7. **Calendar selection.** Read the CALENDARS FOUND section from the calendar output file. Present the user with the list of calendars grouped by type and ask which to include:
+7. **Calendar selection.** Present the discovered calendars to the user and ask which to include:
    ```
    I found these calendars:
-     Work: Kalender (Exchange, 3 events)
+     Work: Kalender (Local, 3 events)
      Personal: Current Routine (Google, 5 events), Family (Google, 0 events)
      Holidays: United States holidays (1 all-day), Schweizerische Feiertage (1 all-day)
-   Which should I include? [suggest Exchange calendars as default]
+   Which should I include? [suggest the user's main work calendar as default]
    ```
-   Use the user's selection when building the Phase 2 subagent prompt — only pass events from the selected calendars. If the agent platform supports persistent memory, save the user's preference so future runs skip this step. If the calendar output is empty or says "none", skip this step entirely — the skill continues without calendar data.
+   If the agent platform supports persistent memory, save the user's preference so future runs skip this step. If no calendars are found, skip steps 7-8 and continue without calendar data.
+
+8. **Extract calendar events** using the user's selection. The `--calendars` flag is **required** — the script refuses to extract without it, ensuring only selected calendars appear in the output:
+   ```bash
+   python3 scripts/calendar_events.py \
+     --date YYYY-MM-DD \
+     --calendars "Kalender (Local)" \
+     --output ~/Desktop/calendar-YYYY-MM-DD.txt
+   ```
+   Calendar identifiers use the `Name (Type)` format shown by `--list-calendars`. Multiple calendars are comma-separated: `--calendars "Kalender (Local),Christoph Kappeler (Local)"`. The output file will only contain events from the specified calendars — no filtering needed downstream.
 
 ### Phase 2: Build Accurate Narrative (CRITICAL)
 
@@ -150,8 +159,8 @@ For each activity you identify, report:
 Use git history to distinguish "coded today" from "committed code written earlier."
 Use browser history visit_duration to find work outside coding sessions (30s+ = real work, 0s = noise). Group repeated visits to the same site/PR/issue.
 
-The user selected these calendars for inclusion: [CALENDAR_SELECTION].
-Use calendar events from these calendars to explain gaps between coding sessions.
+The calendar file is pre-filtered to only the user's selected calendars.
+Use calendar events to explain gaps between coding sessions.
 A 2-hour gap with a Sprint Planning meeting is not idle time — it's meeting time.
 Report meetings as activities with isMeeting=true. All-day events (holidays) are
 background context — note them but don't create timeline items for them.

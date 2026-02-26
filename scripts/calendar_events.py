@@ -13,7 +13,11 @@ On other platforms, writes an empty output file and exits cleanly so the
 day-summary skill can continue without calendar data.
 
 Usage:
-    python scripts/calendar_events.py --date 2026-02-19 --output ~/Desktop/calendar-2026-02-19.txt
+    # Step 1: Discover available calendars
+    python scripts/calendar_events.py --date 2026-02-19 --list-calendars
+
+    # Step 2: Extract events from selected calendars only
+    python scripts/calendar_events.py --date 2026-02-19 --calendars "Kalender (Local)" --output ~/Desktop/calendar-2026-02-19.txt
 """
 
 import argparse
@@ -57,8 +61,16 @@ def compile_swift():
         return False
 
 
-def run_eventkit(date_str):
-    """Run the compiled EventKit binary and return its stdout."""
+def run_eventkit(date_str, calendars=None):
+    """Run the compiled EventKit binary and return its stdout.
+
+    Note: macOS EventKit does not support calendar filtering yet.
+    If calendars is specified, a warning is printed — the output will
+    contain all calendars unfiltered.
+    """
+    if calendars:
+        print("WARNING: --calendars filtering is not yet implemented for macOS EventKit. "
+              "Output will contain all calendars.", file=sys.stderr)
     try:
         result = subprocess.run(
             [str(SWIFT_BINARY), date_str],
@@ -71,13 +83,15 @@ def run_eventkit(date_str):
         return "ERROR: Compiled binary not found.\n", 1
 
 
-def run_outlook(date_str):
+def run_outlook(date_str, calendars=None):
     """Run the PowerShell Outlook COM script and return its stdout."""
     try:
+        cmd = ["powershell", "-ExecutionPolicy", "Bypass", "-NoProfile",
+               "-File", str(OUTLOOK_SCRIPT), date_str]
+        if calendars:
+            cmd.append(calendars)
         result = subprocess.run(
-            ["powershell", "-ExecutionPolicy", "Bypass", "-NoProfile",
-             "-File", str(OUTLOOK_SCRIPT), date_str],
-            capture_output=True, text=True, encoding="utf-8", timeout=120,
+            cmd, capture_output=True, text=True, encoding="utf-8", timeout=120,
         )
         return result.stdout, result.returncode
     except subprocess.TimeoutExpired:
@@ -94,10 +108,55 @@ def write_empty(output_path, date_str, reason):
     print(f"Empty output written to {output_path}")
 
 
+def extract_calendars_found(stdout):
+    """Extract and print just the CALENDARS FOUND section from output."""
+    in_section = False
+    for line in stdout.splitlines():
+        if line.startswith("--- CALENDARS FOUND"):
+            in_section = True
+            print(line)
+            continue
+        if in_section:
+            print(line)
+
+
+def run_platform_script(system, date_str, calendars=None):
+    """Run the appropriate platform script. Returns (stdout, error_reason).
+
+    On success: (stdout_str, None)
+    On failure: (None, "reason string")
+    """
+    if system == "Darwin":
+        if not compile_swift():
+            return None, "Could not compile Swift EventKit CLI"
+        stdout, returncode = run_eventkit(date_str, calendars)
+        if "ACCESS_DENIED" in stdout:
+            return None, "Calendar access denied (enable in System Settings)"
+    elif system == "Windows":
+        stdout, returncode = run_outlook(date_str, calendars)
+    else:
+        return None, "Unsupported platform"
+
+    if not stdout or not stdout.strip():
+        hint = "check Outlook is running" if system == "Windows" else "check calendar access"
+        return None, f"Calendar script returned no output ({hint})"
+    if stdout.startswith("ERROR:"):
+        # Pass through the actual error from the platform script
+        return None, stdout.strip().removeprefix("ERROR:").strip()
+
+    return stdout, None
+
+
 def main():
     parser = argparse.ArgumentParser(description="Extract calendar events for a date")
     parser.add_argument("--date", required=True, help="Date in YYYY-MM-DD format")
-    parser.add_argument("--output", required=True, help="Output file path")
+    parser.add_argument("--list-calendars", action="store_true",
+                        help="Discovery mode: list available calendars and exit")
+    parser.add_argument("--calendars",
+                        help="Comma-separated calendar identifiers to include, "
+                             "e.g. 'Kalender (Local),Christoph Kappeler (Local)'. "
+                             "Required when extracting events (with --output).")
+    parser.add_argument("--output", help="Output file path (required unless --list-calendars)")
     args = parser.parse_args()
 
     # Validate date
@@ -107,42 +166,52 @@ def main():
         print(f"Error: Invalid date format '{args.date}'. Use YYYY-MM-DD.", file=sys.stderr)
         sys.exit(1)
 
-    output_path = os.path.expanduser(args.output)
+    # Validate argument combinations
+    if args.list_calendars:
+        if args.output or args.calendars:
+            print("Error: --list-calendars cannot be combined with --output or --calendars.",
+                  file=sys.stderr)
+            sys.exit(1)
+    else:
+        if not args.output:
+            print("Error: --output is required (or use --list-calendars for discovery).",
+                  file=sys.stderr)
+            sys.exit(1)
+        if not args.calendars:
+            print("Error: --calendars is required. Use --list-calendars first to discover "
+                  "available calendars, then pass the desired ones via --calendars.",
+                  file=sys.stderr)
+            sys.exit(1)
+
     system = platform.system()
 
-    if system == "Darwin":
-        # macOS: Swift EventKit
-        if not compile_swift():
-            write_empty(output_path, args.date,
-                        "Could not compile Swift EventKit CLI (install Xcode Command Line Tools)")
+    if system not in ("Darwin", "Windows"):
+        if args.list_calendars:
+            print("Calendar not supported on this platform (macOS and Windows only).")
             sys.exit(0)
-
-        stdout, returncode = run_eventkit(args.date)
-
-        if "ACCESS_DENIED" in stdout:
-            write_empty(output_path, args.date,
-                        "Calendar access denied. Enable in System Settings > Privacy & Security > Calendars")
-            sys.exit(0)
-
-    elif system == "Windows":
-        # Windows: Outlook COM via PowerShell
-        stdout, returncode = run_outlook(args.date)
-
-    else:
-        # Linux / other: no calendar support
+        output_path = os.path.expanduser(args.output)
         write_empty(output_path, args.date,
                     "Calendar not supported on this platform (macOS and Windows only)")
         sys.exit(0)
 
-    # Handle errors — check for explicit error messages and empty/missing output
-    if not stdout or not stdout.strip():
-        hint = "check Outlook is running" if system == "Windows" else "check calendar access"
-        write_empty(output_path, args.date,
-                    f"Calendar script returned no output ({hint})")
+    # --- Discovery mode ---
+    if args.list_calendars:
+        stdout, error = run_platform_script(system, args.date)
+        if error:
+            print(f"Could not retrieve calendars: {error}", file=sys.stderr)
+            sys.exit(1)
+        extract_calendars_found(stdout)
+        print()
+        print("Use --calendars with identifiers in 'Name (Type)' format, e.g.:")
+        print('  --calendars "Kalender (Local)"')
         sys.exit(0)
 
-    if stdout.startswith("ERROR:"):
-        write_empty(output_path, args.date, stdout.strip())
+    # --- Extraction mode (with calendar filter) ---
+    output_path = os.path.expanduser(args.output)
+    stdout, error = run_platform_script(system, args.date, calendars=args.calendars)
+
+    if error:
+        write_empty(output_path, args.date, error)
         sys.exit(0)
 
     # Write output

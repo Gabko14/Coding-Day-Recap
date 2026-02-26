@@ -2,11 +2,14 @@
 # Called by calendar_events.py on Windows. Outputs pipe-delimited events to stdout
 # in the same format as the macOS EventKit binary.
 #
-# Usage: powershell -ExecutionPolicy Bypass -File calendar_outlook.ps1 <YYYY-MM-DD>
+# Usage: powershell -ExecutionPolicy Bypass -File calendar_outlook.ps1 <YYYY-MM-DD> [<Calendars>]
+# Calendars: optional comma-separated filter, e.g. "Kalender (Local),Christoph Kappeler (Local)"
 
 param(
     [Parameter(Mandatory=$true, Position=0)]
-    [string]$DateStr
+    [string]$DateStr,
+    [Parameter(Position=1)]
+    [string]$Calendars  # comma-separated: "Kalender (Local),Christoph Kappeler (Local)"
 )
 
 $ErrorActionPreference = "Stop"
@@ -104,8 +107,22 @@ foreach ($store in $ns.Stores) {
     }
 }
 
+# Filter to selected calendars if specified
+if ($Calendars) {
+    $calFilter = $Calendars -split ',' | ForEach-Object { $_.Trim() }
+    $unfilteredFolders = $calendarFolders
+    $calendarFolders = @($calendarFolders | Where-Object {
+        "$($_.Name) ($($_.StoreType))" -in $calFilter
+    })
+    if ($calendarFolders.Count -eq 0) {
+        $available = ($unfilteredFolders | ForEach-Object { "`"$($_.Name) ($($_.StoreType))`"" }) -join ', '
+        Write-Output "ERROR: No calendars matched filter '$Calendars'. Available: $available. Re-run with --list-calendars to see identifiers."
+        exit 1
+    }
+}
+
 if ($calendarFolders.Count -eq 0) {
-    Write-Output "ERROR: No calendar folders found in Outlook."
+    Write-Output "ERROR: No calendar folders found in Outlook. Is it running?"
     exit 1
 }
 
