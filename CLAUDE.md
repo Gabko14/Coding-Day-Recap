@@ -29,7 +29,7 @@ python3 scripts/pre_extract.py --from 2026-02-10T08:00 --until 2026-02-10T12:00 
 # Extract browser history
 python3 scripts/browser_history.py --date 2026-02-10 --output browser.txt
 
-# Extract calendar events (macOS only — compiles Swift EventKit CLI on first run)
+# Extract calendar events (macOS: EventKit, Windows: Outlook COM, Linux: skipped)
 python3 scripts/calendar_events.py --date 2026-02-10 --output calendar.txt
 
 # Generate HTML from data JSON

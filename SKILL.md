@@ -77,7 +77,7 @@ This skill requires [CASS](https://github.com/Dicklesworthstone/coding_agent_ses
      --date YYYY-MM-DD \
      --output ~/Desktop/calendar-YYYY-MM-DD.txt
    ```
-   On macOS, the script compiles a Swift EventKit CLI (cached after first run) that reads from the system Calendar app. It outputs all timed events sorted chronologically, all-day events, and a CALENDARS FOUND summary. On other platforms, it writes an empty file and continues.
+   On macOS, the script compiles a Swift EventKit CLI (cached after first run) that reads from the system Calendar app. On Windows, it runs a PowerShell script that queries Outlook via COM automation (works with Exchange, Microsoft 365, and local calendars). Both produce the same output format: timed events sorted chronologically, all-day events, and a CALENDARS FOUND summary. On Linux, it writes an empty file and continues.
 
 7. **Calendar selection.** Read the CALENDARS FOUND section from the calendar output file. Present the user with the list of calendars grouped by type and ask which to include:
    ```
